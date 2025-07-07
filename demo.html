@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Console CLI Bridge - Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #007acc;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        .test-area {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .status {
+            background: #e7f3ff;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        .network-test {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 LetsfixThis</h1>
+        <p class="subtitle">Test page for browser extension and console log capture</p>
+        
+        <div class="status">
+            <strong>📋 Instructions:</strong><br>
+            1. Make sure the browser extension is installed<br>
+            2. Start the CLI server: <code>letsfixthis start</code><br>
+            3. Use the buttons below to generate test logs<br>
+            4. Check your CLI output or use <code>letsfixthis capture</code>
+        </div>
+        
+        <div class="test-area">
+            <h3>🧪 Console Log Tests</h3>
+            <button onclick="testLog()">Generate Log</button>
+            <button onclick="testWarning()">Generate Warning</button>
+            <button onclick="testError()">Generate Error</button>
+            <button onclick="testInfo()">Generate Info</button>
+            <button onclick="testDebug()">Generate Debug</button>
+        </div>
+        
+        <div class="test-area">
+            <h3>🔥 Error Tests</h3>
+            <button onclick="testRuntimeError()">Runtime Error</button>
+            <button onclick="testReferenceError()">Reference Error</button>
+            <button onclick="testPromiseRejection()">Promise Rejection</button>
+        </div>
+        
+        <div class="test-area network-test">
+            <h3>🌐 Network Tests</h3>
+            <button onclick="testNetworkError()">Network Error (404)</button>
+            <button onclick="testNetworkFailure()">Network Failure</button>
+        </div>
+        
+        <div class="test-area">
+            <h3>📊 Object Logging</h3>
+            <button onclick="testObjectLogging()">Log Complex Object</button>
+            <button onclick="testArrayLogging()">Log Array</button>
+        </div>
+        
+        <div class="status">
+            <strong>💡 AI Agent Commands:</strong><br>
+            • <code>letsfixthis agent-info --agent cursor</code><br>
+            • <code>letsfixthis agent-info --agent claude</code><br>
+            • <code>letsfixthis agent-info --agent copilot</code><br>
+            • <code>letsfixthis agent-info --agent windsurfer</code>
+        </div>
+    </div>
+
+    <script>
+        // Basic console tests
+        function testLog() {
+            console.log('✅ This is a test log message');
+        }
+        
+        function testWarning() {
+            console.warn('⚠️ This is a test warning message');
+        }
+        
+        function testError() {
+            console.error('❌ This is a test error message');
+        }
+        
+        function testInfo() {
+            console.info('ℹ️ This is a test info message');
+        }
+        
+        function testDebug() {
+            console.debug('🐛 This is a test debug message');
+        }
+        
+        // Error tests
+        function testRuntimeError() {
+            try {
+                let undefinedVar;
+                undefinedVar.nonExistentMethod();
+            } catch (error) {
+                console.error('Caught runtime error:', error);
+            }
+        }
+        
+        function testReferenceError() {
+            try {
+                nonExistentFunction();
+            } catch (error) {
+                console.error('Caught reference error:', error);
+            }
+        }
+        
+        function testPromiseRejection() {
+            Promise.reject(new Error('Test promise rejection')).catch(error => {
+                console.error('Promise rejection:', error);
+            });
+        }
+        
+        // Network tests
+        function testNetworkError() {
+            fetch('/non-existent-endpoint')
+                .then(response => {
+                    if (!response.ok) {
+                        console.error(`Network error: ${response.status} ${response.statusText}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                });
+        }
+        
+        function testNetworkFailure() {
+            fetch('http://non-existent-domain.invalid/api')
+                .catch(error => {
+                    console.error('Network failure:', error);
+                });
+        }
+        
+        // Object logging tests
+        function testObjectLogging() {
+            const complexObject = {
+                name: 'Test Object',
+                data: {
+                    numbers: [1, 2, 3, 4, 5],
+                    nested: {
+                        deep: {
+                            value: 'buried treasure'
+                        }
+                    }
+                },
+                timestamp: new Date(),
+                method: function() { return 'I am a method'; }
+            };
+            console.log('Complex object:', complexObject);
+        }
+        
+        function testArrayLogging() {
+            const testArray = [
+                'string',
+                123,
+                { nested: 'object' },
+                [1, 2, 3],
+                null,
+                undefined,
+                true
+            ];
+            console.log('Test array:', testArray);
+        }
+        
+        // Initial welcome message
+        console.log('🚀 LetsfixThis test page loaded');
+        console.log('Extension should be capturing this message');
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{
+  "name": "letsfixthis",
+  "version": "1.0.0",
+  "description": "CLI tool to capture browser dev console output for AI coding agents like Cursor, Claude Code, GitHub Copilot, and Windsurfer",
+  "main": "dist/cli.js",
+  "bin": {
+    "letsfixthis": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "start": "npm run build && node dist/cli.js start",
+    "test": "echo \"Tests coming soon\" && exit 0",
+    "watch": "nodemon --exec ts-node src/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "console",
+    "developer-tools",
+    "ai-agents",
+    "cursor",
+    "claude",
+    "copilot",
+    "windsurfer",
+    "debugging",
+    "browser-extension",
+    "websocket",
+    "logging",
+    "development",
+    "ai-assistant",
+    "devtools"
+  ],
+  "author": "Joshua Haydon",
+  "license": "MIT",
+  "type": "commonjs",
+  "homepage": "https://github.com/yourusername/letsfixthis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/letsfixthis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/letsfixthis/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "extension/**/*",
+    "README.md",
+    "LICENSE",
+    "demo.html"
+  ],
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.10",
+    "@types/ws": "^8.18.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  }
+}
