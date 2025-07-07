@@ -260,6 +260,20 @@ letsfixthis capture --format structured
 
 MIT License - see LICENSE file for details
 
+## 🚀 CI/CD Setup
+
+This project includes automated CI/CD pipelines. For maintainers:
+
+### NPM Publishing
+Set the `NPM_TOKEN` secret in your repository settings to enable automatic npm publishing on releases.
+
+### Docker Publishing
+To enable Docker Hub publishing, set these secrets in your repository settings:
+- `DOCKERHUB_USERNAME` - Your Docker Hub username
+- `DOCKERHUB_TOKEN` - Your Docker Hub access token
+
+Without these secrets, the workflow will still build Docker images locally for testing but won't push to registries.
+
 ## 🤝 Contributing
 
 1. Fork the repository
