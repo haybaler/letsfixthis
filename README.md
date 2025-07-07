@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/letsfixthis.svg)](https://badge.fury.io/js/letsfixthis)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/yourusername/letsfixthis/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/yourusername/letsfixthis/actions)
+[![Node.js CI](https://github.com/haybaler/letsfixthis/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/haybaler/letsfixthis/actions)
 [![Downloads](https://img.shields.io/npm/dm/letsfixthis.svg)](https://npmjs.org/package/letsfixthis)
 
 A powerful CLI tool that captures browser developer console output and makes it available for AI coding agents like Cursor, Claude Code, GitHub Copilot, Windsurfer, and development platforms like V0, Bolt, Lovable, and Replit.
@@ -175,8 +175,8 @@ Generated: 2025-01-07T...
 
 ### Build from Source
 ```bash
-git clone <repository-url>
-cd dev-console-cli
+git clone https://github.com/haybaler/letsfixthis.git
+cd letsfixthis
 npm install
 npm run build
 ```
@@ -227,25 +227,25 @@ extension/
 ### With Cursor
 ```bash
 # Get current errors for Cursor to analyze
-dev-console-cli agent-info --agent cursor | cursor-import
+letsfixthis agent-info --agent cursor | cursor-import
 ```
 
 ### With Claude Code
 ```bash
 # Export detailed analysis
-dev-console-cli agent-info --agent claude > context.md
+letsfixthis agent-info --agent claude > context.md
 ```
 
 ### With Development Workflows
 ```bash
 # Start server in background
-dev-console-cli start --watch &
+letsfixthis start --watch &
 
 # Your development process...
 npm run dev
 
 # Get logs when needed
-dev-console-cli capture --format structured
+letsfixthis capture --format structured
 ```
 
 ## 🎯 Use Cases
