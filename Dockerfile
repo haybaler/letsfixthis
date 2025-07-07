@@ -10,6 +10,15 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --only=production
 
+# Copy source files
+COPY . .
+
+# Build the TypeScript project
+RUN npm run build
+
+# Remove dev dependencies for smaller image
+RUN npm prune --production
+
 # Copy built application
 COPY dist/ ./dist/
 COPY extension/ ./extension/
