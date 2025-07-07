@@ -25,7 +25,7 @@ npm install -g letsfixthis
 
 ### From Source
 ```bash
-git clone https://github.com/yourusername/letsfixthis.git
+git clone https://github.com/haybaler/letsfixthis.git
 cd letsfixthis
 npm install
 npm run build
@@ -34,7 +34,7 @@ npm link  # For global installation
 
 ### Docker
 ```bash
-docker run -p 8080:8080 yourusername/letsfixthis:latest
+docker run -p 8080:8080 haybaler/letsfixthis:latest
 ```
 
 ### 2. Install Browser Extension
