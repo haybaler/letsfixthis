@@ -18,6 +18,10 @@ A powerful CLI tool that captures browser developer console output and makes it 
 
 ## 📦 Installation
 
+### Requirements
+- Node.js 18.0.0 or higher
+- npm 8.0.0 or higher
+
 ### NPM (Recommended)
 ```bash
 npm install -g letsfixthis

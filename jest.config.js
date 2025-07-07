@@ -8,4 +8,5 @@ module.exports = {
     'src/**/*.ts',
     '!src/**/*.d.ts',
   ],
+  maxWorkers: 1, // Disable parallelism for better compatibility
 };
