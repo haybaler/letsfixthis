@@ -19,11 +19,6 @@ RUN npm run build
 # Remove dev dependencies for smaller image
 RUN npm prune --production
 
-# Copy built application
-COPY dist/ ./dist/
-COPY extension/ ./extension/
-COPY demo.html ./
-
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
