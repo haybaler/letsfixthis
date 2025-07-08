@@ -4,8 +4,15 @@
 
   let ws = null;
   let serverUrl = 'ws://localhost:8080';
+  let authToken = '';
   let isConnected = false;
   let logQueue = [];
+
+  chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
+    if (result.serverUrl) serverUrl = result.serverUrl;
+    if (result.authToken) authToken = result.authToken;
+    connectWebSocket();
+  });
 
   // Store original console methods
   const originalConsole = {
@@ -18,7 +25,8 @@
 
   function connectWebSocket() {
     try {
-      ws = new WebSocket(serverUrl);
+      const wsUrl = authToken ? `${serverUrl}?token=${encodeURIComponent(authToken)}` : serverUrl;
+      ws = new WebSocket(wsUrl);
       
       ws.onopen = function() {
         isConnected = true;
@@ -92,11 +100,16 @@
       logQueue.push(logEntry);
       
       // Fallback: send via HTTP if WebSocket is not available
-      fetch('http://localhost:8080/api/logs', {
+      const httpBase = serverUrl.replace(/^ws/, 'http');
+      const url = `${httpBase}/api/logs`;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(logEntry)
       }).catch(() => {
         // Silently fail if server is not running
@@ -162,8 +175,7 @@
       });
   };
 
-  // Initialize WebSocket connection
-  connectWebSocket();
+  // Initialize WebSocket connection after settings are loaded (handled above)
 
   // Add visual indicator
   const indicator = document.createElement('div');

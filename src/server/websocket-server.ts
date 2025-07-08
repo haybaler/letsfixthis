@@ -17,19 +17,32 @@ export class DevConsoleServer {
   constructor(options: ServerOptions) {
     this.options = options;
     this.app = express();
-    this.logCapture = new LogCapture();
+    this.logCapture = new LogCapture(options.logFile);
     this.formatter = new OutputFormatter(options.format);
     
     this.setupExpress();
   }
 
   private setupExpress(): void {
-    this.app.use(cors());
+    const corsOptions = this.options.corsOrigin ? { origin: this.options.corsOrigin } : {};
+    this.app.use(cors(corsOptions));
     this.app.use(express.json());
-    
+
     // Serve the browser extension files
     this.app.use('/extension', express.static('extension'));
-    
+
+    // Authentication middleware for API routes
+    this.app.use('/api', (req, res, next) => {
+      if (this.options.authToken) {
+        const authHeader = req.headers['authorization'] as string | undefined;
+        const token = authHeader?.replace('Bearer ', '') || (req.query.token as string | undefined);
+        if (token !== this.options.authToken) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+      }
+      next();
+    });
+
     // API endpoints
     this.app.get('/api/logs', async (req, res) => {
       try {
@@ -88,8 +101,14 @@ export class DevConsoleServer {
     if (!this.server) return;
     
     this.wss = new WebSocket.Server({ server: this.server });
-    
-    this.wss.on('connection', (ws) => {
+
+    this.wss.on('connection', (ws, req) => {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (this.options.authToken && token !== this.options.authToken) {
+        ws.close();
+        return;
+      }
       console.log('🔌 Browser extension connected');
       
       ws.on('message', (data) => {

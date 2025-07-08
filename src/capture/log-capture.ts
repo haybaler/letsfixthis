@@ -6,8 +6,11 @@ export class LogCapture {
   private logs: ConsoleLog[] = [];
   private logFile: string;
 
-  constructor() {
-    this.logFile = path.join(process.cwd(), '.dev-console-logs.json');
+  constructor(logFilePath?: string) {
+    this.logFile =
+      logFilePath ||
+      process.env.DEV_CONSOLE_LOG_FILE ||
+      path.join(process.cwd(), '.dev-console-logs.json');
     this.loadExistingLogs();
   }
 

@@ -5,11 +5,30 @@ document.addEventListener('DOMContentLoaded', function() {
   const testLogBtn = document.getElementById('testLog');
   const clearLogsBtn = document.getElementById('clearLogs');
   const exportLogsBtn = document.getElementById('exportLogs');
+  const serverUrlInput = document.getElementById('serverUrl');
+  const tokenInput = document.getElementById('authToken');
+  const saveBtn = document.getElementById('saveSettings');
+
+  let baseUrl = 'http://localhost:8080';
+  let authToken = '';
+
+  function loadSettings(cb) {
+    chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
+      const url = result.serverUrl || 'ws://localhost:8080';
+      baseUrl = url.replace(/^ws/, 'http');
+      authToken = result.authToken || '';
+      if (serverUrlInput) serverUrlInput.value = url;
+      if (tokenInput) tokenInput.value = authToken;
+      if (cb) cb();
+    });
+  }
 
   // Check server connection status
   async function checkServerStatus() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs');
+      const url = `${baseUrl}/api/logs`;
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
         statusEl.className = 'status connected';
@@ -41,8 +60,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Clear logs
   clearLogsBtn.addEventListener('click', async function() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs', {
-        method: 'DELETE'
+      const url = `${baseUrl}/api/logs`;
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers
       });
       if (response.ok) {
         console.log('✅ Logs cleared');
@@ -58,7 +80,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Export logs
   exportLogsBtn.addEventListener('click', async function() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs');
+      const url = `${baseUrl}/api/logs`;
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const response = await fetch(url, { headers });
       if (response.ok) {
         const logs = await response.json();
         const dataStr = JSON.stringify(logs, null, 2);
@@ -80,8 +104,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  saveBtn.addEventListener('click', function() {
+    const serverUrl = serverUrlInput.value;
+    const token = tokenInput.value;
+    chrome.storage.sync.set({ serverUrl, authToken: token }, () => {
+      loadSettings(checkServerStatus);
+    });
+  });
+
   // Initial status check
-  checkServerStatus();
+  loadSettings(checkServerStatus);
   
   // Periodic status check
   setInterval(checkServerStatus, 5000);

@@ -17,6 +17,9 @@ export interface ServerOptions {
   format: string;
   outputFile?: string;
   watchMode: boolean;
+  logFile?: string;
+  corsOrigin?: string;
+  authToken?: string;
 }
 
 export interface AgentInfo {
