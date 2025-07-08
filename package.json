@@ -10,8 +10,8 @@
     "build": "tsc",
     "dev": "ts-node src/cli.ts",
     "start": "npm run build && node dist/cli.js start",
-    "test": "jest",
-    "test:ci": "npm run build && jest",
+    "test": "node --test",
+    "test:ci": "node --test",
     "watch": "nodemon --exec ts-node src/cli.ts",
     "prepublishOnly": "npm run build"
   },
@@ -56,12 +56,9 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.10",
     "@types/ws": "^8.18.1",
-    "jest": "^30.0.4",
     "nodemon": "^3.1.10",
-    "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },

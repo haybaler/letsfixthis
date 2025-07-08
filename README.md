@@ -73,6 +73,12 @@ letsfixthis capture
 letsfixthis capture --format text --output console-logs.txt
 ```
 
+### Clear Stored Logs
+
+```bash
+letsfixthis clear
+```
+
 ### AI Agent Integration
 
 ```bash
@@ -117,6 +123,8 @@ The browser extension automatically:
 - Handles unhandled promise rejections
 - Shows connection status indicator
 - Queues logs when server is offline
+- Allows configuring server URL and auth token
+  - Token is sent as `Authorization: Bearer <token>` for HTTP requests and as a query parameter for WebSocket connections
 
 ### Extension Features
 - ✅ Real-time connection status
@@ -124,6 +132,9 @@ The browser extension automatically:
 - 📊 Log statistics in popup
 - 🧪 Test log generation
 - 📤 Export functionality
+- 🔑 Custom server URL and auth token settings
+  - Use the popup to set the server address and optional token
+  - The auth token is added as a Bearer header when communicating with the CLI
 
 ## 🔌 API Endpoints
 
@@ -218,11 +229,17 @@ extension/
 ### Environment Variables
 - `DEV_CONSOLE_PORT` - Default server port (default: 8080)
 - `DEV_CONSOLE_FORMAT` - Default output format (default: json)
+- `DEV_CONSOLE_LOG_FILE` - Path to stored log file
+- `DEV_CONSOLE_ORIGIN` - Allowed CORS origin
+- `DEV_CONSOLE_TOKEN` - Authentication token for API and WebSocket
 
 ### CLI Options
 - `--port, -p` - Server port
 - `--format, -f` - Output format (json|text|structured)
 - `--output, -o` - Output file path
+- `--log-file, -l` - Custom log file path
+- `--cors-origin` - Allowed CORS origin
+- `--token` - Authentication token
 - `--watch, -w` - Watch mode for continuous capture
 - `--agent, -a` - Target AI agent for formatting
 
