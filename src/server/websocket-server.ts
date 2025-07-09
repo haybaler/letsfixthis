@@ -30,21 +30,25 @@ export class DevConsoleServer {
 
     // Serve the browser extension files
     this.app.use('/extension', express.static('extension'));
+    
+    // Serve demo.html
+    this.app.use(express.static('.'));
 
-    // Authentication middleware for API routes
-    this.app.use('/api', (req, res, next) => {
+    // Authentication middleware function
+    const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
       if (this.options.authToken) {
         const authHeader = req.headers['authorization'] as string | undefined;
         const token = authHeader?.replace('Bearer ', '') || (req.query.token as string | undefined);
         if (token !== this.options.authToken) {
-          return res.status(401).json({ error: 'Unauthorized' });
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
         }
       }
       next();
-    });
+    };
 
     // API endpoints
-    this.app.get('/api/logs', async (req, res) => {
+    this.app.get('/api/logs', authenticate, async (req, res) => {
       try {
         const logs = await this.logCapture.getCurrentLogs();
         res.json(logs);
@@ -53,7 +57,7 @@ export class DevConsoleServer {
       }
     });
 
-    this.app.post('/api/logs', (req, res) => {
+    this.app.post('/api/logs', authenticate, (req, res) => {
       const log: ConsoleLog = req.body;
       this.logCapture.addLog(log);
       
@@ -64,7 +68,7 @@ export class DevConsoleServer {
       res.json({ success: true });
     });
 
-    this.app.delete('/api/logs', async (req, res) => {
+    this.app.delete('/api/logs', authenticate, async (req, res) => {
       try {
         await this.logCapture.clearLogs();
         res.json({ success: true, message: 'Logs cleared' });
@@ -73,7 +77,7 @@ export class DevConsoleServer {
       }
     });
 
-    this.app.get('/api/agent-info/:agent', async (req, res) => {
+    this.app.get('/api/agent-info/:agent', authenticate, async (req, res) => {
       try {
         const logs = await this.logCapture.getCurrentLogs();
         const agentInfo = this.generateAgentInfo(logs, req.params.agent);

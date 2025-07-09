@@ -43,10 +43,16 @@ docker run -p 8080:8080 haybaler/letsfixthis:latest
 
 ### 2. Install Browser Extension
 
+#### Option A: Chrome Web Store (Recommended)
+*Coming soon!* The extension will be available in the Chrome Web Store for easy installation.
+
+#### Option B: Manual Installation
 1. Open Chrome/Edge and go to `chrome://extensions/`
 2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `extension/` folder
+3. Click "Load unpacked" and select the `extension/` folder from the project
 4. The extension icon should appear in your browser toolbar
+
+**Note**: The Chrome Web Store version is in review. For now, use manual installation.
 
 ## 🔧 Usage
 

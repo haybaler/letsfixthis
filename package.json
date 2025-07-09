@@ -1,6 +1,6 @@
 {
   "name": "letsfixthis",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "CLI tool to capture browser dev console output for AI coding agents like Cursor, Claude Code, GitHub Copilot, and Windsurfer",
   "main": "dist/cli.js",
   "bin": {
@@ -13,7 +13,9 @@
     "test": "node --test",
     "test:ci": "node --test",
     "watch": "nodemon --exec ts-node src/cli.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "extension:zip": "cd extension && zip -r ../letsfixthis-extension.zip . -x '*.DS_Store'",
+    "version:bump": "npm version patch && npm run extension:zip"
   },
   "keywords": [
     "cli",
@@ -49,6 +51,7 @@
   "files": [
     "dist/**/*",
     "extension/**/*",
+    "bin/**/*",
     "README.md",
     "LICENSE",
     "demo.html"
