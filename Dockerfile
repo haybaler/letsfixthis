@@ -29,12 +29,16 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose the default port
-EXPOSE 8080
+# Environment variables for configuration
+ENV PORT=8080
+ENV HOST=0.0.0.0
 
-# Health check
+# Expose the port (can be overridden)
+EXPOSE ${PORT}
+
+# Health check using environment variables
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8080/api/logs', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:' + process.env.PORT + '/api/logs', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
-# Start the application
-CMD ["node", "dist/cli.js", "start", "--port", "8080"]
+# Start the application with environment variables
+CMD node dist/cli.js start --port ${PORT} --host ${HOST}

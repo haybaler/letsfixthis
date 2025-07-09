@@ -6,6 +6,8 @@ import { LogCapture } from './capture/log-capture';
 import { OutputFormatter } from './output/formatter';
 import { ConsoleLog } from './types';
 import { version } from '../package.json';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const program = new Command();
 
@@ -18,22 +20,59 @@ program
   .command('start')
   .description('Start the dev console capture server')
   .option('-p, --port <port>', 'WebSocket server port', '8080')
+  .option('-h, --host <host>', 'Host to bind to (use 0.0.0.0 for all interfaces)', '0.0.0.0')
   .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
   .option('-o, --output <file>', 'Output file path')
   .option('-w, --watch', 'Watch mode - continuously capture')
   .action(async (options) => {
     console.log('🚀 Starting LetsfixThis...');
     
+    // Check for .letsfixthis config file
+    let configPort = parseInt(options.port);
+    let configHost = options.host;
+    
+    const configPath = path.join(process.cwd(), '.letsfixthis');
+    if (fs.existsSync(configPath)) {
+      try {
+        const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        // Use config file values if not overridden by CLI args
+        if (options.port === '8080' && configData.port) {
+          configPort = configData.port;
+          console.log(`📋 Using port ${configPort} from .letsfixthis config`);
+        }
+        if (options.host === '0.0.0.0' && configData.host) {
+          configHost = configData.host;
+          console.log(`📋 Using host ${configHost} from .letsfixthis config`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error reading .letsfixthis config file:', error);
+      }
+    }
+    
     const server = new DevConsoleServer({
-      port: parseInt(options.port),
+      port: configPort,
+      host: configHost,
       format: options.format,
       outputFile: options.output,
       watchMode: options.watch
     });
     
     await server.start();
-    console.log(`📡 Server running on port ${options.port}`);
+    const displayHost = configHost === '0.0.0.0' ? 'all interfaces' : configHost;
+    console.log(`📡 Server running on ${displayHost}:${configPort}`);
     console.log('📋 Install browser extension and refresh your dev environment');
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\n🛑 Shutting down server...');
+      await server.stop();
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      await server.stop();
+      process.exit(0);
+    });
   });
 
 program

@@ -33,17 +33,30 @@ if [ ! -d "dist" ]; then
     echo ""
 fi
 
+# Set default values
+PORT=${PORT:-8080}
+HOST=${HOST:-0.0.0.0}
+
 # Start the server
 echo "🚀 Starting Dev Console CLI Bridge server..."
 echo ""
 echo "📋 Instructions:"
 echo "1. Install the browser extension from the 'extension/' folder"
-echo "2. Open the demo page: file://$(pwd)/demo.html"
-echo "3. Open another terminal and run: node dist/cli.js capture"
-echo "4. Or try: node dist/cli.js agent-info --agent cursor"
+echo "2. Configure the extension to connect to your server URL"
+echo "3. Open the demo page: file://$(pwd)/demo.html"
+echo "4. Open another terminal and run: node dist/cli.js capture"
+echo "5. Or try: node dist/cli.js agent-info --agent cursor"
 echo ""
-echo "Server starting on http://localhost:8080"
+
+if [ "$HOST" = "0.0.0.0" ]; then
+    echo "Server starting on:"
+    echo "  - http://localhost:$PORT"
+    echo "  - http://$(hostname -I | awk '{print $1}'):$PORT (network access)"
+else
+    echo "Server starting on http://$HOST:$PORT"
+fi
+
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-node dist/cli.js start
+node dist/cli.js start --port $PORT --host $HOST

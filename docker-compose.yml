@@ -4,16 +4,18 @@ services:
   dev-console-cli:
     build: .
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     environment:
       - NODE_ENV=production
+      - PORT=${PORT:-8080}
+      - HOST=${HOST:-0.0.0.0}
     volumes:
       # Mount extension files for development
       - ./extension:/app/extension:ro
       - ./demo.html:/app/demo.html:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/api/logs', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:' + process.env.PORT + '/api/logs', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3

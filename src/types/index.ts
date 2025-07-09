@@ -14,6 +14,7 @@ export interface ConsoleLog {
 
 export interface ServerOptions {
   port: number;
+  host?: string;
   format: string;
   outputFile?: string;
   watchMode: boolean;

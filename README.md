@@ -48,6 +48,16 @@ docker run -p 8080:8080 haybaler/letsfixthis:latest
 3. Click "Load unpacked" and select the `extension/` folder
 4. The extension icon should appear in your browser toolbar
 
+### 3. Configure Extension (Optional)
+
+By default, the extension connects to `http://localhost:8080`. To use a different server:
+
+1. Click the extension icon and then click "⚙️ Settings"
+2. Enter your server URL (e.g., `http://192.168.1.100:8080` or `https://my-server.com:8080`)
+3. Click "Save Settings" and test the connection
+
+The extension supports any host - local, network, or remote servers.
+
 ## 🔧 Usage
 
 ### Start the CLI Server
@@ -128,12 +138,14 @@ The browser extension automatically:
 ## 🔌 API Endpoints
 
 ### WebSocket
-- `ws://localhost:8080` - Real-time log streaming
+- `ws://[your-server]:8080` - Real-time log streaming
 
 ### HTTP REST API
-- `GET /api/logs` - Get all captured logs
-- `POST /api/logs` - Add a new log entry
-- `GET /api/agent-info/:agent` - Get agent-specific formatted data
+- `GET http://[your-server]:8080/api/logs` - Get all captured logs
+- `POST http://[your-server]:8080/api/logs` - Add a new log entry
+- `GET http://[your-server]:8080/api/agent-info/:agent` - Get agent-specific formatted data
+
+Replace `[your-server]` with your actual server address (e.g., `localhost`, `192.168.1.100`, `my-server.com`)
 
 ## 📋 Output Formats
 
@@ -184,6 +196,24 @@ cd letsfixthis
 npm install
 npm run build
 ```
+
+### Running on Different Hosts
+
+To make the server accessible from other devices on your network:
+
+```bash
+# Start server on all network interfaces
+letsfixthis start --host 0.0.0.0 --port 8080
+
+# Find your local IP address
+# On macOS/Linux: ifconfig or ip addr
+# On Windows: ipconfig
+
+# Configure the extension to connect to:
+# http://YOUR_LOCAL_IP:8080
+```
+
+For production deployments, use a reverse proxy (nginx, Apache) with HTTPS.
 
 ### Development Mode
 ```bash

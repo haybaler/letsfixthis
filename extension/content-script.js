@@ -1,11 +1,18 @@
 // Content script that captures console logs and sends them to the CLI
-(function() {
+(async function() {
   'use strict';
 
   let ws = null;
-  let serverUrl = 'ws://localhost:8080';
+  let config = null;
+  let serverUrl = null;
   let isConnected = false;
   let logQueue = [];
+
+  // Load configuration
+  async function loadConfig() {
+    config = await getConfig();
+    serverUrl = getWebSocketUrl(config.serverUrl);
+  }
 
   // Store original console methods
   const originalConsole = {
@@ -16,8 +23,12 @@
     debug: console.debug
   };
 
-  function connectWebSocket() {
+  async function connectWebSocket() {
     try {
+      if (!serverUrl) {
+        await loadConfig();
+      }
+      
       ws = new WebSocket(serverUrl);
       
       ws.onopen = function() {
@@ -92,15 +103,17 @@
       logQueue.push(logEntry);
       
       // Fallback: send via HTTP if WebSocket is not available
-      fetch('http://localhost:8080/api/logs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(logEntry)
-      }).catch(() => {
-        // Silently fail if server is not running
-      });
+      if (config && config.serverUrl) {
+        fetch(`${config.serverUrl}/api/logs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(logEntry)
+        }).catch(() => {
+          // Silently fail if server is not running
+        });
+      }
     }
   }
 
@@ -162,8 +175,21 @@
       });
   };
 
-  // Initialize WebSocket connection
+  // Initialize configuration and WebSocket connection
+  await loadConfig();
   connectWebSocket();
+
+  // Listen for configuration changes
+  chrome.storage.onChanged.addListener(async (changes, namespace) => {
+    if (namespace === 'sync' && changes.scrapershot_config) {
+      await loadConfig();
+      // Reconnect with new server URL
+      if (ws) {
+        ws.close();
+      }
+      connectWebSocket();
+    }
+  });
 
   // Add visual indicator
   const indicator = document.createElement('div');

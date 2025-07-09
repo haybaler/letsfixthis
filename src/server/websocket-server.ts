@@ -5,6 +5,7 @@ import cors from 'cors';
 import { ConsoleLog, ServerOptions } from '../types';
 import { LogCapture } from '../capture/log-capture';
 import { OutputFormatter } from '../output/formatter';
+import { ServiceDiscovery } from './discovery';
 
 export class DevConsoleServer {
   private wss: WebSocket.Server | null = null;
@@ -69,13 +70,33 @@ export class DevConsoleServer {
         res.status(500).json({ error: 'Failed to generate agent info' });
       }
     });
+    
+    // Discovery endpoint
+    this.app.get('/api/discovery', (req, res) => {
+      res.json({
+        service: 'letsfixthis',
+        version: '1.0.0',
+        port: this.options.port,
+        host: this.options.host || '0.0.0.0'
+      });
+    });
   }
 
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.server = this.app.listen(this.options.port, () => {
+        const host = this.options.host || '0.0.0.0';
+        this.server = this.app.listen(this.options.port, host, async () => {
           this.setupWebSocket();
+          
+          // Register server for discovery
+          await ServiceDiscovery.registerServer({
+            port: this.options.port,
+            host: host,
+            pid: process.pid,
+            startTime: Date.now()
+          });
+          
           resolve();
         });
       } catch (error) {
@@ -160,6 +181,9 @@ export class DevConsoleServer {
   }
 
   async stop(): Promise<void> {
+    // Unregister server from discovery
+    await ServiceDiscovery.unregisterServer();
+    
     if (this.wss) {
       this.wss.close();
     }

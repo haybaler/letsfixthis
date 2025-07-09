@@ -1,15 +1,19 @@
 // Popup script
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   const statusEl = document.getElementById('status');
   const logsCountEl = document.getElementById('logsCount');
   const testLogBtn = document.getElementById('testLog');
   const clearLogsBtn = document.getElementById('clearLogs');
   const exportLogsBtn = document.getElementById('exportLogs');
+  const settingsBtn = document.getElementById('settingsBtn');
+  
+  // Load configuration
+  const config = await getConfig();
 
   // Check server connection status
   async function checkServerStatus() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs');
+      const response = await fetch(`${config.serverUrl}/api/logs`);
       if (response.ok) {
         const data = await response.json();
         statusEl.className = 'status connected';
@@ -41,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Clear logs
   clearLogsBtn.addEventListener('click', async function() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs', {
+      const response = await fetch(`${config.serverUrl}/api/logs`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -58,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Export logs
   exportLogsBtn.addEventListener('click', async function() {
     try {
-      const response = await fetch('http://localhost:8080/api/logs');
+      const response = await fetch(`${config.serverUrl}/api/logs`);
       if (response.ok) {
         const logs = await response.json();
         const dataStr = JSON.stringify(logs, null, 2);
@@ -79,6 +83,13 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('❌ Error exporting logs:', error);
     }
   });
+  
+  // Settings button handler
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function() {
+      chrome.runtime.openOptionsPage();
+    });
+  }
 
   // Initial status check
   checkServerStatus();
