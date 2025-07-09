@@ -18,21 +18,38 @@ export class DevConsoleServer {
   constructor(options: ServerOptions) {
     this.options = options;
     this.app = express();
-    this.logCapture = new LogCapture();
+    this.logCapture = new LogCapture(options.logFile);
     this.formatter = new OutputFormatter(options.format);
     
     this.setupExpress();
   }
 
   private setupExpress(): void {
-    this.app.use(cors());
+    const corsOptions = this.options.corsOrigin ? { origin: this.options.corsOrigin } : {};
+    this.app.use(cors(corsOptions));
     this.app.use(express.json());
-    
+
     // Serve the browser extension files
     this.app.use('/extension', express.static('extension'));
     
+    // Serve demo.html
+    this.app.use(express.static('.'));
+
+    // Authentication middleware function
+    const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (this.options.authToken) {
+        const authHeader = req.headers['authorization'] as string | undefined;
+        const token = authHeader?.replace('Bearer ', '') || (req.query.token as string | undefined);
+        if (token !== this.options.authToken) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+      }
+      next();
+    };
+
     // API endpoints
-    this.app.get('/api/logs', async (req, res) => {
+    this.app.get('/api/logs', authenticate, async (req, res) => {
       try {
         const logs = await this.logCapture.getCurrentLogs();
         res.json(logs);
@@ -41,7 +58,7 @@ export class DevConsoleServer {
       }
     });
 
-    this.app.post('/api/logs', (req, res) => {
+    this.app.post('/api/logs', authenticate, (req, res) => {
       const log: ConsoleLog = req.body;
       this.logCapture.addLog(log);
       
@@ -52,7 +69,7 @@ export class DevConsoleServer {
       res.json({ success: true });
     });
 
-    this.app.delete('/api/logs', async (req, res) => {
+    this.app.delete('/api/logs', authenticate, async (req, res) => {
       try {
         await this.logCapture.clearLogs();
         res.json({ success: true, message: 'Logs cleared' });
@@ -61,7 +78,7 @@ export class DevConsoleServer {
       }
     });
 
-    this.app.get('/api/agent-info/:agent', async (req, res) => {
+    this.app.get('/api/agent-info/:agent', authenticate, async (req, res) => {
       try {
         const logs = await this.logCapture.getCurrentLogs();
         const agentInfo = this.generateAgentInfo(logs, req.params.agent);
@@ -109,8 +126,14 @@ export class DevConsoleServer {
     if (!this.server) return;
     
     this.wss = new WebSocket.Server({ server: this.server });
-    
-    this.wss.on('connection', (ws) => {
+
+    this.wss.on('connection', (ws, req) => {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (this.options.authToken && token !== this.options.authToken) {
+        ws.close();
+        return;
+      }
       console.log('🔌 Browser extension connected');
       
       ws.on('message', (data) => {

@@ -4,14 +4,27 @@
 
   let ws = null;
   let config = null;
-  let serverUrl = null;
+  let serverUrl = 'ws://localhost:8080';
+  let authToken = '';
   let isConnected = false;
   let logQueue = [];
 
-  // Load configuration
+  // Load configuration with auto-discovery support
   async function loadConfig() {
-    config = await getConfig();
-    serverUrl = getWebSocketUrl(config.serverUrl);
+    // Try new config system first
+    if (typeof getConfig !== 'undefined') {
+      config = await getConfig();
+      serverUrl = getWebSocketUrl(config.serverUrl);
+    }
+    
+    // Also check for auth settings
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
+        if (result.serverUrl) serverUrl = result.serverUrl;
+        if (result.authToken) authToken = result.authToken;
+        resolve();
+      });
+    });
   }
 
   // Store original console methods
@@ -25,11 +38,8 @@
 
   async function connectWebSocket() {
     try {
-      if (!serverUrl) {
-        await loadConfig();
-      }
-      
-      ws = new WebSocket(serverUrl);
+      const wsUrl = authToken ? `${serverUrl}?token=${encodeURIComponent(authToken)}` : serverUrl;
+      ws = new WebSocket(wsUrl);
       
       ws.onopen = function() {
         isConnected = true;
@@ -103,17 +113,20 @@
       logQueue.push(logEntry);
       
       // Fallback: send via HTTP if WebSocket is not available
-      if (config && config.serverUrl) {
-        fetch(`${config.serverUrl}/api/logs`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(logEntry)
-        }).catch(() => {
-          // Silently fail if server is not running
-        });
-      }
+      const httpBase = serverUrl.replace(/^ws/, 'http');
+      const url = `${httpBase}/api/logs`;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(logEntry)
+      }).catch(() => {
+        // Silently fail if server is not running
+      });
     }
   }
 
@@ -181,7 +194,7 @@
 
   // Listen for configuration changes
   chrome.storage.onChanged.addListener(async (changes, namespace) => {
-    if (namespace === 'sync' && changes.scrapershot_config) {
+    if (namespace === 'sync') {
       await loadConfig();
       // Reconnect with new server URL
       if (ws) {

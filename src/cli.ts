@@ -23,6 +23,9 @@ program
   .option('-h, --host <host>', 'Host to bind to (use 0.0.0.0 for all interfaces)', '0.0.0.0')
   .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
   .option('-o, --output <file>', 'Output file path')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .option('--cors-origin <origin>', 'Allowed CORS origin')
+  .option('--token <token>', 'Authentication token for API and WS')
   .option('-w, --watch', 'Watch mode - continuously capture')
   .action(async (options) => {
     console.log('🚀 Starting LetsfixThis...');
@@ -54,7 +57,10 @@ program
       host: configHost,
       format: options.format,
       outputFile: options.output,
-      watchMode: options.watch
+      watchMode: options.watch,
+      logFile: options.logFile || process.env.DEV_CONSOLE_LOG_FILE,
+      corsOrigin: options.corsOrigin || process.env.DEV_CONSOLE_ORIGIN,
+      authToken: options.token || process.env.DEV_CONSOLE_TOKEN
     });
     
     await server.start();
@@ -80,8 +86,9 @@ program
   .description('Capture current console state')
   .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
   .option('-o, --output <file>', 'Output file path')
+  .option('-l, --log-file <file>', 'Path to log file')
   .action(async (options) => {
-    const capture = new LogCapture();
+    const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     const formatter = new OutputFormatter(options.format);
     
     try {
@@ -104,8 +111,9 @@ program
   .command('agent-info')
   .description('Get formatted info for AI agents')
   .option('-a, --agent <agent>', 'Target agent (cursor|claude|copilot|windsurfer)', 'cursor')
+  .option('-l, --log-file <file>', 'Path to log file')
   .action(async (options) => {
-    const capture = new LogCapture();
+    const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     const logs = await capture.getCurrentLogs();
     
     const agentInfo = {
@@ -122,6 +130,16 @@ program
     };
     
     console.log(JSON.stringify(agentInfo, null, 2));
+  });
+
+program
+  .command('clear')
+  .description('Clear stored console logs')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .action(async (options) => {
+    const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
+    await capture.clearLogs();
+    console.log('🗑️  Logs cleared');
   });
 
 function generateSuggestions(logs: ConsoleLog[]): string[] {

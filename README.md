@@ -43,10 +43,16 @@ docker run -p 8080:8080 haybaler/letsfixthis:latest
 
 ### 2. Install Browser Extension
 
+#### Option A: Chrome Web Store (Recommended)
+*Coming soon!* The extension will be available in the Chrome Web Store for easy installation.
+
+#### Option B: Manual Installation
 1. Open Chrome/Edge and go to `chrome://extensions/`
 2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `extension/` folder
+3. Click "Load unpacked" and select the `extension/` folder from the project
 4. The extension icon should appear in your browser toolbar
+
+**Note**: The Chrome Web Store version is in review. For now, use manual installation.
 
 ### 3. Configure Extension (Optional)
 
@@ -56,7 +62,7 @@ By default, the extension connects to `http://localhost:8080`. To use a differen
 2. Enter your server URL (e.g., `http://192.168.1.100:8080` or `https://my-server.com:8080`)
 3. Click "Save Settings" and test the connection
 
-The extension supports any host - local, network, or remote servers.
+The extension supports any host - local, network, or remote servers with auto-discovery.
 
 ## 🔧 Usage
 
@@ -81,6 +87,12 @@ letsfixthis capture
 
 # Export to file with specific format
 letsfixthis capture --format text --output console-logs.txt
+```
+
+### Clear Stored Logs
+
+```bash
+letsfixthis clear
 ```
 
 ### AI Agent Integration
@@ -127,6 +139,8 @@ The browser extension automatically:
 - Handles unhandled promise rejections
 - Shows connection status indicator
 - Queues logs when server is offline
+- Allows configuring server URL and auth token
+  - Token is sent as `Authorization: Bearer <token>` for HTTP requests and as a query parameter for WebSocket connections
 
 ### Extension Features
 - ✅ Real-time connection status
@@ -134,6 +148,9 @@ The browser extension automatically:
 - 📊 Log statistics in popup
 - 🧪 Test log generation
 - 📤 Export functionality
+- 🔑 Custom server URL and auth token settings
+  - Use the popup to set the server address and optional token
+  - The auth token is added as a Bearer header when communicating with the CLI
 
 ## 🔌 API Endpoints
 
@@ -246,15 +263,51 @@ extension/
 ## 🔧 Configuration
 
 ### Environment Variables
+- `PORT` - Server port (default: 8080)
+- `HOST` - Server host (default: 0.0.0.0)
 - `DEV_CONSOLE_PORT` - Default server port (default: 8080)
 - `DEV_CONSOLE_FORMAT` - Default output format (default: json)
+- `DEV_CONSOLE_LOG_FILE` - Path to stored log file
+- `DEV_CONSOLE_ORIGIN` - Allowed CORS origin
+- `DEV_CONSOLE_TOKEN` - Authentication token for API and WebSocket
 
 ### CLI Options
 - `--port, -p` - Server port
+- `--host, -h` - Host to bind to (use 0.0.0.0 for all interfaces)
 - `--format, -f` - Output format (json|text|structured)
 - `--output, -o` - Output file path
+- `--log-file, -l` - Custom log file path
+- `--cors-origin` - Allowed CORS origin
+- `--token` - Authentication token
 - `--watch, -w` - Watch mode for continuous capture
 - `--agent, -a` - Target AI agent for formatting
+
+### Project Configuration File
+Create a `.letsfixthis` file in your project root:
+```json
+{
+  "port": 3000,
+  "host": "0.0.0.0"
+}
+```
+
+### Running on Different Hosts
+
+To make the server accessible from other devices on your network:
+
+```bash
+# Start server on all network interfaces
+letsfixthis start --host 0.0.0.0 --port 8080
+
+# Find your local IP address
+# On macOS/Linux: ifconfig or ip addr
+# On Windows: ipconfig
+
+# Configure the extension to connect to:
+# http://YOUR_LOCAL_IP:8080
+```
+
+For production deployments, use a reverse proxy (nginx, Apache) with HTTPS.
 
 ## 🤝 Integration Examples
 
