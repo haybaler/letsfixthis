@@ -1,6 +1,6 @@
 {
   "name": "letsfixthis",
-  "version": "2.1.0"
+  "version": "2.1.0",
   "description": "CLI tool to capture browser dev console output for AI coding agents like Cursor, Claude Code, GitHub Copilot, and Windsurfer",
   "main": "dist/cli.js",
   "bin": {
