@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev) for building
+RUN npm ci
 
 # Copy source files
 COPY . .
@@ -30,7 +30,7 @@ RUN chown -R nodejs:nodejs /app
 USER nodejs
 
 # Environment variables for configuration
-ENV PORT=8080
+ENV PORT=8090
 ENV HOST=0.0.0.0
 
 # Expose the port (can be overridden)
