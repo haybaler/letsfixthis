@@ -1,14 +1,14 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
 const fs = require('fs');
 
 const content = fs.readFileSync('src/server/websocket-server.ts', 'utf-8');
 
-test('server checks auth token for API', () => {
-  assert.ok(/authorization/i.test(content), 'Authorization header not used');
-  assert.ok(content.includes('authToken'), 'authToken option missing');
-});
+describe('Server Tests', () => {
+  test('server checks auth token for API', () => {
+    expect(content).toMatch(/authorization/i);
+    expect(content).toContain('authToken');
+  });
 
-test('server serves extension files', () => {
-  assert.ok(content.includes("express.static('extension')"), 'extension static serving missing');
+  test('server serves extension files', () => {
+    expect(content).toContain("express.static('extension')");
+  });
 });

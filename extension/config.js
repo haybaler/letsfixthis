@@ -3,14 +3,14 @@ const CONFIG_KEY = 'scrapershot_config';
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  serverUrl: 'http://localhost:8080',
+  serverUrl: 'http://localhost:8090',
   wsProtocol: 'ws',
   apiTimeout: 30000,
   autoDiscover: true
 };
 
 // Common ports to scan for auto-discovery
-const DISCOVERY_PORTS = [8080, 3000, 3001, 3030, 5000, 8000];
+const DISCOVERY_PORTS = [8090, 8080, 3000, 3001, 3030, 5000, 8000];
 
 // Get configuration from Chrome storage
 async function getConfig() {

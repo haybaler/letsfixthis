@@ -4,23 +4,33 @@
 
   let ws = null;
   let config = null;
-  let serverUrl = 'ws://localhost:8080';
+  let serverUrl = 'ws://localhost:8090';
   let authToken = '';
   let isConnected = false;
   let logQueue = [];
 
   // Load configuration with auto-discovery support
   async function loadConfig() {
-    // Try new config system first
-    if (typeof getConfig !== 'undefined') {
-      config = await getConfig();
-      serverUrl = getWebSocketUrl(config.serverUrl);
-    }
-    
-    // Also check for auth settings
     return new Promise((resolve) => {
-      chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
-        if (result.serverUrl) serverUrl = result.serverUrl;
+      chrome.storage.sync.get(['scrapershot_config', 'serverUrl', 'authToken'], (result) => {
+        // Try new config system first
+        if (result.scrapershot_config) {
+          config = result.scrapershot_config;
+          // Convert HTTP URL to WebSocket URL
+          if (config.serverUrl) {
+            try {
+              const url = new URL(config.serverUrl);
+              const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+              serverUrl = `${wsProtocol}//${url.host}`;
+            } catch (e) {
+              serverUrl = config.serverUrl.replace(/^https?:/, 'ws:');
+            }
+          }
+        } else if (result.serverUrl) {
+          // Fallback to old config
+          serverUrl = result.serverUrl;
+        }
+        
         if (result.authToken) authToken = result.authToken;
         resolve();
       });
@@ -43,7 +53,7 @@
       
       ws.onopen = function() {
         isConnected = true;
-        console.log('🔌 Connected to LetsfixThis CLI');
+        originalConsole.log('🔌 Connected to LetsfixThis CLI');
         
         // Send queued logs
         while (logQueue.length > 0) {
@@ -54,18 +64,18 @@
       
       ws.onclose = function() {
         isConnected = false;
-        console.log('🔌 Disconnected from LetsfixThis CLI');
+        originalConsole.log('🔌 Disconnected from LetsfixThis CLI');
         
         // Try to reconnect after 3 seconds
         setTimeout(connectWebSocket, 3000);
       };
       
-      ws.onerror = function(error) {
-        console.error('WebSocket error:', error);
+      ws.onerror = function() {
+        // Don't log WebSocket errors to avoid circular logging
         isConnected = false;
       };
     } catch (error) {
-      console.error('Failed to connect to LetsfixThis CLI:', error);
+      // Don't log connection errors to avoid circular logging
       // Try to reconnect after 5 seconds
       setTimeout(connectWebSocket, 5000);
     }
@@ -73,7 +83,7 @@
 
   function sendLog(level, args, error = null) {
     const logEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       timestamp: Date.now(),
       level: level,
       message: args.map(arg => {
@@ -193,7 +203,7 @@
   connectWebSocket();
 
   // Listen for configuration changes
-  chrome.storage.onChanged.addListener(async (changes, namespace) => {
+  chrome.storage.onChanged.addListener(async (_, namespace) => {
     if (namespace === 'sync') {
       await loadConfig();
       // Reconnect with new server URL

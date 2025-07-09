@@ -1,23 +1,23 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
 const fs = require('fs');
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
 
-test('package information defined', () => {
-  assert.equal(pkg.name, 'letsfixthis');
-  assert.match(pkg.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(pkg.main, 'dist/cli.js');
-  assert.equal(pkg.bin.letsfixthis, './dist/cli.js');
-});
+describe('CLI Tests', () => {
+  test('package information defined', () => {
+    expect(pkg.name).toBe('letsfixthis');
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(pkg.main).toBe('dist/cli.js');
+    expect(pkg.bin.letsfixthis).toBe('./dist/cli.js');
+  });
 
-test('required dependencies exist', () => {
-  for (const dep of ['commander', 'express', 'ws', 'cors']) {
-    assert.ok(pkg.dependencies && pkg.dependencies[dep], `missing dependency ${dep}`);
-  }
-});
+  test('required dependencies exist', () => {
+    for (const dep of ['commander', 'express', 'ws', 'cors']) {
+      expect(pkg.dependencies).toHaveProperty(dep);
+    }
+  });
 
-test('CLI exposes clear command', () => {
-  const content = fs.readFileSync('src/cli.ts', 'utf-8');
-  assert.ok(content.includes("command('clear')"));
+  test('CLI exposes clear command', () => {
+    const content = fs.readFileSync('src/cli.ts', 'utf-8');
+    expect(content).toContain("command('clear')");
+  });
 });

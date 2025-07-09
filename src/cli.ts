@@ -19,7 +19,7 @@ program
 program
   .command('start')
   .description('Start the dev console capture server')
-  .option('-p, --port <port>', 'WebSocket server port', '8080')
+  .option('-p, --port <port>', 'WebSocket server port', '8090')
   .option('-h, --host <host>', 'Host to bind to (use 0.0.0.0 for all interfaces)', '0.0.0.0')
   .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
   .option('-o, --output <file>', 'Output file path')
@@ -39,7 +39,7 @@ program
       try {
         const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         // Use config file values if not overridden by CLI args
-        if (options.port === '8080' && configData.port) {
+        if (options.port === '8090' && configData.port) {
           configPort = configData.port;
           console.log(`📋 Using port ${configPort} from .letsfixthis config`);
         }
@@ -65,8 +65,8 @@ program
     
     await server.start();
     const displayHost = configHost === '0.0.0.0' ? 'all interfaces' : configHost;
-    console.log(`📡 Server running on ${displayHost}:${configPort}`);
-    console.log('📋 Install browser extension and refresh your dev environment');
+    console.log(`📡 LetsfixThis capture server running on ${displayHost}:${configPort}`);
+    console.log('📋 Browser extension ready - refresh your page to start capturing console logs');
     
     // Handle graceful shutdown
     process.on('SIGINT', async () => {

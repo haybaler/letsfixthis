@@ -38,7 +38,7 @@ npm link  # For global installation
 
 ### Docker
 ```bash
-docker run -p 8080:8080 haybaler/letsfixthis:latest
+docker run -p 8090:8090 haybaler/letsfixthis:latest
 ```
 
 ### 2. Install Browser Extension
@@ -56,10 +56,10 @@ docker run -p 8080:8080 haybaler/letsfixthis:latest
 
 ### 3. Configure Extension (Optional)
 
-By default, the extension connects to `http://localhost:8080`. To use a different server:
+By default, the extension connects to `http://localhost:8090`. To use a different server:
 
 1. Click the extension icon and then click "⚙️ Settings"
-2. Enter your server URL (e.g., `http://192.168.1.100:8080` or `https://my-server.com:8080`)
+2. Enter your server URL (e.g., `http://192.168.1.100:8090` or `https://my-server.com:8090`)
 3. Click "Save Settings" and test the connection
 
 The extension supports any host - local, network, or remote servers with auto-discovery.
@@ -68,12 +68,15 @@ The extension supports any host - local, network, or remote servers with auto-di
 
 ### Start the CLI Server
 
+Run LetsfixThis alongside your development server:
+
 ```bash
-# Start with default settings
+# Start your dev server first (e.g., npm run dev, yarn start, etc.)
+# Then in another terminal:
 letsfixthis start
 
-# Custom port and format
-letsfixthis start --port 3000 --format structured
+# Custom port to avoid conflicts
+letsfixthis start --port 8090
 
 # Watch mode with file output
 letsfixthis start --watch --output logs.json
