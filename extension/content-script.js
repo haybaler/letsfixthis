@@ -8,6 +8,8 @@
   let authToken = '';
   let isConnected = false;
   let logQueue = [];
+  let reconnectTimeout = null;
+  let isReconnecting = false;
 
   // Load configuration with auto-discovery support
   async function loadConfig() {
@@ -47,37 +49,65 @@
   };
 
   async function connectWebSocket() {
+    // Prevent multiple simultaneous connection attempts
+    if (isReconnecting || (ws && ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    
+    // Clear any existing timeout
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    
+    // Close existing connection if any
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      ws.close();
+    }
+    
+    isReconnecting = true;
+    
     try {
       const wsUrl = authToken ? `${serverUrl}?token=${encodeURIComponent(authToken)}` : serverUrl;
       ws = new WebSocket(wsUrl);
       
       ws.onopen = function() {
         isConnected = true;
+        isReconnecting = false;
         originalConsole.log('🔌 Connected to LetsfixThis CLI');
         
         // Send queued logs
-        while (logQueue.length > 0) {
+        while (logQueue.length > 0 && ws.readyState === WebSocket.OPEN) {
           const log = logQueue.shift();
-          ws.send(JSON.stringify(log));
+          try {
+            ws.send(JSON.stringify(log));
+          } catch (e) {
+            // Put it back if send fails
+            logQueue.unshift(log);
+            break;
+          }
         }
       };
       
       ws.onclose = function() {
         isConnected = false;
+        isReconnecting = false;
         originalConsole.log('🔌 Disconnected from LetsfixThis CLI');
         
         // Try to reconnect after 3 seconds
-        setTimeout(connectWebSocket, 3000);
+        reconnectTimeout = setTimeout(connectWebSocket, 3000);
       };
       
       ws.onerror = function() {
         // Don't log WebSocket errors to avoid circular logging
         isConnected = false;
+        isReconnecting = false;
       };
     } catch (error) {
       // Don't log connection errors to avoid circular logging
+      isReconnecting = false;
       // Try to reconnect after 5 seconds
-      setTimeout(connectWebSocket, 5000);
+      reconnectTimeout = setTimeout(connectWebSocket, 5000);
     }
   }
 
@@ -118,7 +148,13 @@
     }
 
     if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(logEntry));
+      try {
+        ws.send(JSON.stringify(logEntry));
+      } catch (e) {
+        // If send fails, queue it
+        logQueue.push(logEntry);
+        isConnected = false;
+      }
     } else {
       logQueue.push(logEntry);
       
