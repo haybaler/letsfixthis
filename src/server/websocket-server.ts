@@ -37,7 +37,8 @@ export class DevConsoleServer {
         const authHeader = req.headers['authorization'] as string | undefined;
         const token = authHeader?.replace('Bearer ', '') || (req.query.token as string | undefined);
         if (token !== this.options.authToken) {
-          return res.status(401).json({ error: 'Unauthorized' });
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
         }
       }
       next();

@@ -8,11 +8,17 @@
   let isConnected = false;
   let logQueue = [];
 
-  chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
-    if (result.serverUrl) serverUrl = result.serverUrl;
-    if (result.authToken) authToken = result.authToken;
+  const ext = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
+
+  if (ext && ext.storage && ext.storage.sync) {
+    ext.storage.sync.get(['serverUrl', 'authToken'], (result) => {
+      if (result.serverUrl) serverUrl = result.serverUrl;
+      if (result.authToken) authToken = result.authToken;
+      connectWebSocket();
+    });
+  } else {
     connectWebSocket();
-  });
+  }
 
   // Store original console methods
   const originalConsole = {
@@ -58,7 +64,7 @@
     }
   }
 
-  function sendLog(level, args, error = null) {
+  function sendLog(level, args, error = null, extra = {}) {
     const logEntry = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: Date.now(),
@@ -85,7 +91,8 @@
       }),
       url: window.location.href,
       type: 'console',
-      source: 'browser'
+      source: 'browser',
+      ...extra
     };
 
     if (error && error.stack) {
@@ -159,21 +166,81 @@
     });
   });
 
-  // Capture network errors (basic implementation)
+  // Capture network requests and responses with timing information
   const originalFetch = window.fetch;
-  window.fetch = function(...args) {
-    return originalFetch.apply(this, args)
+  window.fetch = function(input, init = {}) {
+    const method = (init && init.method) || 'GET';
+    const start = Date.now();
+
+    return originalFetch.call(this, input, init)
       .then(response => {
+        const duration = Date.now() - start;
         if (!response.ok) {
-          sendLog('error', [`Network Error: ${response.status} ${response.statusText} - ${args[0]}`]);
+          sendLog('error', [`Network Error: ${response.status} ${response.statusText} - ${input}`], null, {
+            type: 'network',
+            method,
+            status: response.status,
+            statusText: response.statusText,
+            duration
+          });
+        } else {
+          sendLog('info', [`Fetch ${method} ${input} -> ${response.status}`], null, {
+            type: 'network',
+            method,
+            status: response.status,
+            statusText: response.statusText,
+            duration
+          });
         }
         return response;
       })
       .catch(error => {
-        sendLog('error', [`Fetch Error: ${error.message} - ${args[0]}`], error);
+        const duration = Date.now() - start;
+        sendLog('error', [`Fetch Error: ${error.message} - ${input}`], error, {
+          type: 'network',
+          method,
+          duration
+        });
         throw error;
       });
   };
+
+  // Capture XMLHttpRequest network activity
+  const OriginalXHR = window.XMLHttpRequest;
+  function WrappedXHR() {
+    const xhr = new OriginalXHR();
+    let method = 'GET';
+    let url = '';
+    let start = 0;
+
+    xhr.open = function(m, u, ...rest) {
+      method = m;
+      url = u;
+      return OriginalXHR.prototype.open.call(xhr, m, u, ...rest);
+    };
+
+    xhr.addEventListener('loadstart', () => {
+      start = Date.now();
+    });
+
+    xhr.addEventListener('loadend', () => {
+      const duration = Date.now() - start;
+      const status = xhr.status;
+      const statusText = xhr.statusText;
+      const level = status >= 200 && status < 400 ? 'info' : 'error';
+      sendLog(level, [`XHR ${method} ${url} -> ${status}`], null, {
+        type: 'network',
+        method,
+        status,
+        statusText,
+        duration
+      });
+    });
+
+    return xhr;
+  }
+
+  window.XMLHttpRequest = WrappedXHR;
 
   // Initialize WebSocket connection after settings are loaded (handled above)
 

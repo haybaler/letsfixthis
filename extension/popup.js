@@ -12,8 +12,15 @@ document.addEventListener('DOMContentLoaded', function() {
   let baseUrl = 'http://localhost:8080';
   let authToken = '';
 
+  const ext = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
+
   function loadSettings(cb) {
-    chrome.storage.sync.get(['serverUrl', 'authToken'], (result) => {
+    if (!ext || !ext.storage || !ext.storage.sync) {
+      if (cb) cb();
+      return;
+    }
+
+    ext.storage.sync.get(['serverUrl', 'authToken'], (result) => {
       const url = result.serverUrl || 'ws://localhost:8080';
       baseUrl = url.replace(/^ws/, 'http');
       authToken = result.authToken || '';
@@ -107,9 +114,11 @@ document.addEventListener('DOMContentLoaded', function() {
   saveBtn.addEventListener('click', function() {
     const serverUrl = serverUrlInput.value;
     const token = tokenInput.value;
-    chrome.storage.sync.set({ serverUrl, authToken: token }, () => {
-      loadSettings(checkServerStatus);
-    });
+    if (ext && ext.storage && ext.storage.sync) {
+      ext.storage.sync.set({ serverUrl, authToken: token }, () => {
+        loadSettings(checkServerStatus);
+      });
+    }
   });
 
   // Initial status check

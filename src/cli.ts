@@ -14,11 +14,22 @@ program
   .description('Capture browser dev console output for AI coding agents')
   .version(version);
 
+const envPort = process.env.DEV_CONSOLE_PORT;
+const envFormat = process.env.DEV_CONSOLE_FORMAT;
+
 program
   .command('start')
   .description('Start the dev console capture server')
-  .option('-p, --port <port>', 'WebSocket server port', '8080')
-  .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
+  .option(
+    '-p, --port <port>',
+    'WebSocket server port',
+    envPort || '8080'
+  )
+  .option(
+    '-f, --format <format>',
+    'Output format (json|text|structured)',
+    envFormat || 'json'
+  )
   .option('-o, --output <file>', 'Output file path')
   .option('-l, --log-file <file>', 'Path to log file')
   .option('--cors-origin <origin>', 'Allowed CORS origin')
@@ -45,7 +56,11 @@ program
 program
   .command('capture')
   .description('Capture current console state')
-  .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
+  .option(
+    '-f, --format <format>',
+    'Output format (json|text|structured)',
+    envFormat || 'json'
+  )
   .option('-o, --output <file>', 'Output file path')
   .option('-l, --log-file <file>', 'Path to log file')
   .action(async (options) => {
