@@ -9,9 +9,9 @@ A powerful CLI tool that captures browser developer console output and makes it 
 
 ## 🚀 Features
 
-- **Real-time Console Capture** - Captures all console logs, warnings, errors, and network issues
+- **Real-time Console Capture** - Captures console logs, warnings, errors, and detailed network activity
 - **AI Agent Integration** - Formats output specifically for different AI coding agents
-- **Browser Extension** - Easy-to-install extension for seamless integration
+- **Browser Extension** - Easy-to-install extension for Chrome, Chromium, Edge, and Firefox
 - **Multiple Output Formats** - JSON, text, and structured formats
 - **WebSocket & HTTP APIs** - Real-time streaming and REST endpoints
 - **Cross-Platform** - Works with any development environment
@@ -43,7 +43,8 @@ docker run -p 8080:8080 haybaler/letsfixthis:latest
 
 ### 2. Install Browser Extension
 
-1. Open Chrome/Edge and go to `chrome://extensions/`
+1. Open Chrome, **Chromium**, or Edge and go to `chrome://extensions/` (Edge: `edge://extensions/`).
+   Firefox users can navigate to `about:debugging#/runtime/this-firefox`.
 2. Enable "Developer mode"
 3. Click "Load unpacked" and select the `extension/` folder
 4. The extension icon should appear in your browser toolbar
@@ -119,7 +120,7 @@ Browser state format optimized for web development workflows.
 
 The browser extension automatically:
 - Captures all console output (logs, warnings, errors)
-- Intercepts network errors
+- Intercepts network requests with status and timing information
 - Handles unhandled promise rejections
 - Shows connection status indicator
 - Queues logs when server is offline
@@ -132,6 +133,7 @@ The browser extension automatically:
 - 📊 Log statistics in popup
 - 🧪 Test log generation
 - 📤 Export functionality
+- 🌐 Works in Chromium and Firefox
 - 🔑 Custom server URL and auth token settings
   - Use the popup to set the server address and optional token
   - The auth token is added as a Bearer header when communicating with the CLI
@@ -232,6 +234,9 @@ extension/
 - `DEV_CONSOLE_LOG_FILE` - Path to stored log file
 - `DEV_CONSOLE_ORIGIN` - Allowed CORS origin
 - `DEV_CONSOLE_TOKEN` - Authentication token for API and WebSocket
+
+These variables act as defaults for the CLI options when corresponding flags are
+not provided.
 
 ### CLI Options
 - `--port, -p` - Server port

@@ -10,6 +10,10 @@ export interface ConsoleLog {
   columnNumber?: number;
   type?: 'console' | 'network' | 'exception';
   source?: string;
+  method?: string;
+  status?: number;
+  statusText?: string;
+  duration?: number;
 }
 
 export interface ServerOptions {
