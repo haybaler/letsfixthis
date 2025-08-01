@@ -6,6 +6,7 @@ import { ConsoleLog, ServerOptions } from '../types';
 import { LogCapture } from '../capture/log-capture';
 import { OutputFormatter } from '../output/formatter';
 import { ServiceDiscovery } from './discovery';
+import { generateSuggestions } from '../suggestions';
 
 export class DevConsoleServer {
   private wss: WebSocket.Server | null = null;
@@ -125,15 +126,22 @@ export class DevConsoleServer {
   private setupWebSocket(): void {
     if (!this.server) return;
     
-    this.wss = new WebSocket.Server({ server: this.server });
+    this.wss = new WebSocket.Server({
+      server: this.server,
+      verifyClient: (info, done) => {
+        if (this.options.authToken) {
+          const authHeader = info.req.headers['authorization'] as string | undefined;
+          const token = authHeader?.replace('Bearer ', '');
+          if (token !== this.options.authToken) {
+            done(false, 401, 'Unauthorized');
+            return;
+          }
+        }
+        done(true);
+      }
+    });
 
     this.wss.on('connection', (ws, req) => {
-      const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const token = url.searchParams.get('token');
-      if (this.options.authToken && token !== this.options.authToken) {
-        ws.close();
-        return;
-      }
       console.log('🔌 Browser extension connected');
       
       ws.on('message', (data) => {
@@ -181,26 +189,7 @@ export class DevConsoleServer {
   }
 
   private generateSuggestions(logs: ConsoleLog[]): string[] {
-    const suggestions: string[] = [];
-    
-    const errors = logs.filter(log => log.level === 'error');
-    const warnings = logs.filter(log => log.level === 'warn');
-    
-    if (errors.length > 0) {
-      suggestions.push('Focus on resolving the console errors first');
-      suggestions.push('Check for JavaScript runtime errors and fix syntax issues');
-    }
-    
-    if (warnings.length > 0) {
-      suggestions.push('Review console warnings for potential performance issues');
-    }
-    
-    const networkErrors = logs.filter(log => log.type === 'network');
-    if (networkErrors.length > 0) {
-      suggestions.push('Check network requests and API endpoints');
-    }
-    
-    return suggestions;
+    return generateSuggestions(logs);
   }
 
   async stop(): Promise<void> {

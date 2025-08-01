@@ -68,8 +68,8 @@
     isReconnecting = true;
     
     try {
-      const wsUrl = authToken ? `${serverUrl}?token=${encodeURIComponent(authToken)}` : serverUrl;
-      ws = new WebSocket(wsUrl);
+      const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+      ws = new WebSocket(serverUrl, [], { headers });
       
       ws.onopen = function() {
         isConnected = true;
@@ -98,16 +98,27 @@
         reconnectTimeout = setTimeout(connectWebSocket, 3000);
       };
       
-      ws.onerror = function() {
+      ws.onerror = function(error) {
         // Don't log WebSocket errors to avoid circular logging
         isConnected = false;
         isReconnecting = false;
+        showConnectionError(error);
       };
     } catch (error) {
       // Don't log connection errors to avoid circular logging
       isReconnecting = false;
+      showConnectionError(error);
       // Try to reconnect after 5 seconds
       reconnectTimeout = setTimeout(connectWebSocket, 5000);
+    }
+  }
+
+  function showConnectionError(error) {
+    originalConsole.error('🔌 LetsfixThis connection failed:', error);
+    const indicator = document.getElementById('letsfixthis-indicator');
+    if (indicator) {
+      indicator.textContent = '🔌 LetsfixThis ✗ (Connection Error)';
+      indicator.style.background = '#dc3545';
     }
   }
 

@@ -161,9 +161,31 @@ The browser extension automatically:
 - `ws://[your-server]:8080` - Real-time log streaming
 
 ### HTTP REST API
-- `GET http://[your-server]:8080/api/logs` - Get all captured logs
-- `POST http://[your-server]:8080/api/logs` - Add a new log entry
-- `GET http://[your-server]:8080/api/agent-info/:agent` - Get agent-specific formatted data
+
+All endpoints support the `Authorization: Bearer <token>` header for authentication.
+
+- `GET /api/logs`
+  - **Description**: Get all captured logs.
+  - **Response**: `200 OK` - A JSON array of log objects.
+
+- `POST /api/logs`
+  - **Description**: Add a new log entry.
+  - **Request Body**: A JSON object representing a single log entry.
+  - **Response**: `200 OK` - `{ "success": true }`
+
+- `DELETE /api/logs`
+  - **Description**: Clear all captured logs.
+  - **Response**: `200 OK` - `{ "success": true, "message": "Logs cleared" }`
+
+- `GET /api/agent-info/:agent`
+  - **Description**: Get agent-specific formatted data.
+  - **URL Parameters**:
+    - `agent`: The target AI agent (e.g., `cursor`, `claude`, `copilot`, `windsurfer`).
+  - **Response**: `200 OK` - A JSON object formatted for the specified agent.
+
+- `GET /api/discovery`
+    - **Description**: Discover the `letsfixthis` service on the network.
+    - **Response**: `200 OK` - A JSON object with service details.
 
 Replace `[your-server]` with your actual server address (e.g., `localhost`, `192.168.1.100`, `my-server.com`)
 

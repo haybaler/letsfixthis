@@ -5,6 +5,7 @@ import { DevConsoleServer } from './server/websocket-server';
 import { LogCapture } from './capture/log-capture';
 import { OutputFormatter } from './output/formatter';
 import { ConsoleLog } from './types';
+import { generateSuggestions } from './suggestions';
 import { version } from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -141,28 +142,5 @@ program
     await capture.clearLogs();
     console.log('🗑️  Logs cleared');
   });
-
-function generateSuggestions(logs: ConsoleLog[]): string[] {
-  const suggestions: string[] = [];
-  
-  const errors = logs.filter(log => log.level === 'error');
-  const warnings = logs.filter(log => log.level === 'warn');
-  
-  if (errors.length > 0) {
-    suggestions.push('Focus on resolving the console errors first');
-    suggestions.push('Check for JavaScript runtime errors and fix syntax issues');
-  }
-  
-  if (warnings.length > 0) {
-    suggestions.push('Review console warnings for potential performance issues');
-  }
-  
-  const networkErrors = logs.filter(log => log.type === 'network');
-  if (networkErrors.length > 0) {
-    suggestions.push('Check network requests and API endpoints');
-  }
-  
-  return suggestions;
-}
 
 program.parse();
