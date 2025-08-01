@@ -1,5 +1,7 @@
 import * as WebSocket from 'ws';
+import * as https from 'https';
 import * as http from 'http';
+import * as fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import { ConsoleLog, ServerOptions } from '../types';
@@ -10,7 +12,7 @@ import { generateSuggestions } from '../suggestions';
 
 export class DevConsoleServer {
   private wss: WebSocket.Server | null = null;
-  private server: http.Server | null = null;
+  private server: https.Server | http.Server | null = null;
   private app: express.Application;
   private logCapture: LogCapture;
   private formatter: OutputFormatter;
@@ -29,12 +31,6 @@ export class DevConsoleServer {
     const corsOptions = this.options.corsOrigin ? { origin: this.options.corsOrigin } : {};
     this.app.use(cors(corsOptions));
     this.app.use(express.json());
-
-    // Serve the browser extension files
-    this.app.use('/extension', express.static('extension'));
-    
-    // Serve demo.html
-    this.app.use(express.static('.'));
 
     // Authentication middleware function
     const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -98,13 +94,31 @@ export class DevConsoleServer {
         host: this.options.host || '0.0.0.0'
       });
     });
+    
+    // Serve the browser extension files
+    this.app.use('/extension', express.static('extension'));
+    
+    // Serve demo.html
+    this.app.use(express.static('.'));
   }
 
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         const host = this.options.host || '0.0.0.0';
-        this.server = this.app.listen(this.options.port, host, async () => {
+        
+        // Check for SSL certificate and key
+        if (fs.existsSync('key.pem') && fs.existsSync('cert.pem')) {
+          const options = {
+            key: fs.readFileSync('key.pem'),
+            cert: fs.readFileSync('cert.pem')
+          };
+          this.server = https.createServer(options, this.app);
+        } else {
+          this.server = http.createServer(this.app);
+        }
+
+        this.server.listen(this.options.port, host, async () => {
           this.setupWebSocket();
           
           // Register server for discovery
@@ -130,8 +144,8 @@ export class DevConsoleServer {
       server: this.server,
       verifyClient: (info, done) => {
         if (this.options.authToken) {
-          const authHeader = info.req.headers['authorization'] as string | undefined;
-          const token = authHeader?.replace('Bearer ', '');
+          const url = new URL(info.req.url || '', `http://${info.req.headers.host}`);
+          const token = url.searchParams.get('token');
           if (token !== this.options.authToken) {
             done(false, 401, 'Unauthorized');
             return;

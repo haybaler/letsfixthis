@@ -4,7 +4,7 @@
 
   let ws = null;
   let config = null;
-  let serverUrl = 'ws://localhost:8090';
+  let serverUrl = 'ws://localhost:8080';
   let authToken = '';
   let isConnected = false;
   let logQueue = [];
@@ -68,8 +68,11 @@
     isReconnecting = true;
     
     try {
-      const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-      ws = new WebSocket(serverUrl, [], { headers });
+      const url = new URL(serverUrl);
+      if (authToken) {
+        url.searchParams.set('token', authToken);
+      }
+      ws = new WebSocket(url.toString());
       
       ws.onopen = function() {
         isConnected = true;
