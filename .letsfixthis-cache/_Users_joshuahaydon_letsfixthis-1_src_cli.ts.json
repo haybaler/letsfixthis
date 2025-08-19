@@ -1,7 +1,7 @@
 {
   "filePath": "/Users/joshuahaydon/letsfixthis-1/src/cli.ts",
-  "size": 19704,
-  "hash": "f7ad1df7583bd62f51c10a03c0c78ecd3b714a6e",
+  "size": 23701,
+  "hash": "b675f4ffdfe83f776c756b11123d58fc77d8fad7",
   "imports": [
     "commander",
     "./server/websocket-server",

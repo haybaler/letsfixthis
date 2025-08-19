@@ -1,0 +1,16 @@
+{
+  "filePath": "/Users/joshuahaydon/letsfixthis-1/src/ai/vercel-ai-provider.ts",
+  "size": 6008,
+  "hash": "bf770c5d2bb4e2148a575b51efc06e0450c7cd89",
+  "imports": [
+    "ai",
+    "openai",
+    "@anthropic-ai/sdk",
+    "./key-resolver",
+    "../types",
+    "./ai-provider"
+  ],
+  "exports": [
+    "VercelAIProvider"
+  ]
+}

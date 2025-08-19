@@ -24,6 +24,21 @@ export class OpenAIDevProvider extends BaseAIProvider {
       throw new Error('OpenAI API key not configured');
     }
 
+    // Avoid remote calls if there are no logs
+    if (logs.length === 0) {
+      return {
+        summary: 'No issues detected in the console logs. The application seems to be running without any errors, warnings, or network issues.',
+        suggestions: [
+          'Consider enabling more verbose logging during development',
+          'Add error boundaries and try/catch to capture potential issues'
+        ],
+        priority: 'low',
+        codeFixes: [],
+        explanations: [],
+        confidence: 0.95
+      };
+    }
+
     try {
       // OpenAI Dev Tools specific analysis
       const analysis = await this.analyzeWithOpenAIDevTools(logs);

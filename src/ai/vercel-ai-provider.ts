@@ -29,6 +29,17 @@ export class VercelAIProvider extends BaseAIProvider {
       throw new Error('No AI API keys configured');
     }
 
+    // Avoid remote calls if there are no logs; provide a local lightweight analysis
+    if (logs.length === 0) {
+      return {
+        summary: 'Found 0 console entries with 0 errors, 0 warnings, and 0 network issues.',
+        suggestions: [],
+        priority: 'low',
+        explanations: [],
+        confidence: 0.5
+      };
+    }
+
     const prompt = this.buildAnalysisPrompt(logs);
     
     try {
@@ -39,9 +50,11 @@ export class VercelAIProvider extends BaseAIProvider {
       }
     } catch (error) {
       console.error('AI analysis failed:', error);
+      // Fallback to local analysis instead of erroring out
+      return super.analyze(logs);
     }
 
-    // Fallback to base analysis
+    // Defensive fallback if no provider branch returned
     return super.analyze(logs);
   }
 

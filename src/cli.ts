@@ -257,6 +257,35 @@ program
     const logs = await capture.getCurrentLogs();
     
     console.log(`🔍 Analyzing ${logs.length} console logs...`);
+
+    // If there are no logs, avoid calling remote providers and provide guidance
+    if (logs.length === 0) {
+      const emptyAnalysis = {
+        summary: 'No console logs found to analyze.',
+        suggestions: [
+          'Generate some logs, e.g. run your app and capture errors/warnings',
+          'Use "letsfixthis add-log --message \"Test error\" --level error" to add a sample log',
+          'Pipe or import logs via "letsfixthis import-logs --file logs.json"',
+          'Use interactive mode: "letsfixthis interactive"'
+        ],
+        priority: 'low',
+        explanations: [],
+        confidence: 1
+      } as any;
+
+      if (options.format === 'detailed') {
+        console.log('\n📊 AI Analysis Results:\n');
+        console.log('🤖 LOCAL:');
+        console.log(`   Summary: ${emptyAnalysis.summary}`);
+        console.log(`   Priority: ${String(emptyAnalysis.priority).toUpperCase()}`);
+        console.log(`   Confidence: ${(emptyAnalysis.confidence * 100).toFixed(1)}%`);
+        console.log(`   Suggestions: ${emptyAnalysis.suggestions.length}`);
+      } else {
+        console.log(JSON.stringify({ timestamp: new Date().toISOString(), total_logs: 0, analyses: { local: emptyAnalysis } }, null, 2));
+      }
+      console.log('\nℹ️  Tip: Start the server (letsfixthis start) and add logs with "add-log" or capture from your app.');
+      return;
+    }
     
     if (options.provider === 'all') {
       const analyses = await aiManager.analyzeWithAll(logs);
@@ -322,6 +351,62 @@ program
         console.log(JSON.stringify(analysis, null, 2));
       }
     }
+  });
+
+// Health check and setup helpers
+program
+  .command('doctor')
+  .description('Diagnose configuration and provider availability')
+  .action(async () => {
+    const providers = ['vercel-ai', 'cerebrus', 'openai-dev'];
+    const available = aiManager.getAvailableProviders();
+    console.log('🩺 LetsfixThis Doctor\n');
+    console.log(`Providers registered: ${providers.join(', ')}`);
+    console.log(`Providers available: ${available.join(', ') || '(none)'}`);
+    const keysFile = path.join(process.cwd(), '.letsfixthis.keys.json');
+    console.log(`Keys file: ${fs.existsSync(keysFile) ? keysFile : '(not found in current dir)'}`);
+    console.log('Environment variables (presence only):');
+    const envFlags = {
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
+      VERCEL_AI_OPENAI_API_KEY: !!process.env.VERCEL_AI_OPENAI_API_KEY,
+      VERCEL_AI_OPENAI_BASE_URL: !!process.env.VERCEL_AI_OPENAI_BASE_URL,
+      OPENAI_DEV_OPENAI_API_KEY: !!process.env.OPENAI_DEV_OPENAI_API_KEY,
+      OPENAI_DEV_OPENAI_BASE_URL: !!process.env.OPENAI_DEV_OPENAI_BASE_URL,
+      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+      VERCEL_AI_ANTHROPIC_API_KEY: !!process.env.VERCEL_AI_ANTHROPIC_API_KEY,
+      CEREBRUS_API_KEY: !!process.env.CEREBRUS_API_KEY,
+      CEREBRUS_ENDPOINT: !!process.env.CEREBRUS_ENDPOINT,
+    } as Record<string, boolean>;
+    Object.entries(envFlags).forEach(([k, v]) => console.log(`  ${k}: ${v ? 'set' : 'not set'}`));
+    console.log('\nNext steps:');
+    console.log('- Run "letsfixthis init-keys" to create a keys file template');
+    console.log('- Or export provider-specific environment variables (see README)');
+  });
+
+program
+  .command('init-keys')
+  .description('Create a .letsfixthis.keys.json template in the current directory')
+  .action(() => {
+    const target = path.join(process.cwd(), '.letsfixthis.keys.json');
+    if (fs.existsSync(target)) {
+      console.log('✔️  .letsfixthis.keys.json already exists');
+      return;
+    }
+    const template = {
+      providers: {
+        'vercel-ai': {
+          openai: { apiKey: 'YOUR_OPENAI_KEY', baseURL: 'https://api.openai.com/v1' },
+          anthropic: { apiKey: 'YOUR_ANTHROPIC_KEY' }
+        },
+        'openai-dev': {
+          openai: { apiKey: 'YOUR_OPENAI_KEY', baseURL: 'https://api.openai.com/v1' }
+        },
+        cerebrus: { apiKey: 'YOUR_CEREBRUS_KEY', endpoint: 'https://api.cerebras.ai' }
+      }
+    } as any;
+    fs.writeFileSync(target, JSON.stringify(template, null, 2));
+    console.log('✅ Created .letsfixthis.keys.json');
   });
 
 program

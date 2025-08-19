@@ -1,0 +1,13 @@
+{
+  "filePath": "/Users/joshuahaydon/letsfixthis-1/src/ai/openai-dev-provider.ts",
+  "size": 9985,
+  "hash": "9ffdcb812ebcd9b5e7cf93339dc9518c55e69e82",
+  "imports": [
+    "../types",
+    "./ai-provider",
+    "./key-resolver"
+  ],
+  "exports": [
+    "OpenAIDevProvider"
+  ]
+}

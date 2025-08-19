@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.2] - 2025-08-19
+
+### Added
+- CLI: New `doctor` command to diagnose configuration and provider availability
+- CLI: New `init-keys` command to create `.letsfixthis.keys.json` template
+- Providers: Graceful handling of empty logs with local analysis instead of remote API calls
+
+### Fixed
+- CLI: `analyze` command now provides helpful guidance when no logs are present
+- Providers: Better error handling with fallback to local analysis instead of noisy stack traces
+- UX: More intuitive first-time experience with clear setup instructions
+
 ## [3.1.1] - 2025-08-19
 
 ### Fixed

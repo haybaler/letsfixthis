@@ -1,8 +1,8 @@
 {
   "/Users/joshuahaydon/letsfixthis-1/src/cli.ts": {
     "filePath": "/Users/joshuahaydon/letsfixthis-1/src/cli.ts",
-    "size": 19704,
-    "hash": "f7ad1df7583bd62f51c10a03c0c78ecd3b714a6e",
+    "size": 23701,
+    "hash": "b675f4ffdfe83f776c756b11123d58fc77d8fad7",
     "imports": [
       "commander",
       "./server/websocket-server",
@@ -51,8 +51,37 @@
   "/Users/joshuahaydon/letsfixthis-1/package.json": {
     "filePath": "/Users/joshuahaydon/letsfixthis-1/package.json",
     "size": 2038,
-    "hash": "39474ae4c4597c86f491ed8b17bfcc02738c7e3d",
+    "hash": "f37e4ee4771a29a41d17157b890e84d5ea85b039",
     "imports": [],
     "exports": []
+  },
+  "/Users/joshuahaydon/letsfixthis-1/src/ai/vercel-ai-provider.ts": {
+    "filePath": "/Users/joshuahaydon/letsfixthis-1/src/ai/vercel-ai-provider.ts",
+    "size": 6008,
+    "hash": "bf770c5d2bb4e2148a575b51efc06e0450c7cd89",
+    "imports": [
+      "ai",
+      "openai",
+      "@anthropic-ai/sdk",
+      "./key-resolver",
+      "../types",
+      "./ai-provider"
+    ],
+    "exports": [
+      "VercelAIProvider"
+    ]
+  },
+  "/Users/joshuahaydon/letsfixthis-1/src/ai/openai-dev-provider.ts": {
+    "filePath": "/Users/joshuahaydon/letsfixthis-1/src/ai/openai-dev-provider.ts",
+    "size": 9985,
+    "hash": "9ffdcb812ebcd9b5e7cf93339dc9518c55e69e82",
+    "imports": [
+      "../types",
+      "./ai-provider",
+      "./key-resolver"
+    ],
+    "exports": [
+      "OpenAIDevProvider"
+    ]
   }
 }

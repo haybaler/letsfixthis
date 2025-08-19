@@ -1,6 +1,6 @@
 {
   "name": "letsfixthis",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "AI-powered CLI tool to capture and analyze browser console output with Vercel AI SDK, Cerebrus, and OpenAI Dev Tools integration",
   "main": "dist/cli.js",
   "bin": {
