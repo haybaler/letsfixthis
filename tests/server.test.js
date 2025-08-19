@@ -8,7 +8,7 @@ describe('Server Tests', () => {
     expect(content).toContain('authToken');
   });
 
-  test('server serves extension files', () => {
-    expect(content).toContain("express.static('extension')");
+  test('server serves static files from project root', () => {
+    expect(content).toContain("express.static('.')");
   });
 });

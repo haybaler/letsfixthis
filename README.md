@@ -1,5 +1,6 @@
 # LetsfixThis
 
+[![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](./docs/index.md)
 [![npm version](https://badge.fury.io/js/letsfixthis.svg)](https://badge.fury.io/js/letsfixthis)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js CI](https://github.com/haybaler/letsfixthis/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/haybaler/letsfixthis/actions)
@@ -11,7 +12,8 @@ A powerful CLI tool that captures browser developer console output and makes it 
 
 - **Real-time Console Capture** - Captures all console logs, warnings, errors, and network issues
 - **AI Agent Integration** - Formats output specifically for different AI coding agents
-- **Browser Extension** - Easy-to-install extension for seamless integration
+- **Advanced AI Analysis** - Powered by Vercel AI SDK, Cerebras (provider id: `cerebrus`), and OpenAI Dev Tools
+- Extension-free operation — capture via CLI, HTTP API, or WebSocket
 - **Multiple Output Formats** - JSON, text, and structured formats
 - **WebSocket & HTTP APIs** - Real-time streaming and REST endpoints
 - **Cross-Platform** - Works with any development environment
@@ -21,6 +23,86 @@ A powerful CLI tool that captures browser developer console output and makes it 
 ### Requirements
 - Node.js 18.0.0 or higher
 - npm 8.0.0 or higher
+
+### AI Provider Setup (Optional)
+For enhanced AI analysis, configure your API keys (focus: OpenAI + optional Cerebras routing). Different providers can use different keys without manual switching, via provider‑specific env vars or `.letsfixthis.keys.json`.
+
+1. Copy the example environment file:
+   ```bash
+   cp env.example .env
+   ```
+
+2. Add your API keys to `.env`:
+   ```bash
+   # OpenAI (for OpenAI Dev Tools and Vercel AI)
+   OPENAI_API_KEY=your_openai_api_key_here
+
+   # Optional: route OpenAI calls via Cerebras OpenAI-compatible endpoint
+   # Get key via Cerebras Cloud, set base URL and reuse OPENAI_API_KEY with Cerebras key if desired
+   # OPENAI_BASE_URL=https://api.cerebras.ai/openai/v1
+
+   # Anthropic (optional, for Vercel AI)
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+   # Provider-specific overrides (optional; avoid manual switching):
+   # For Vercel AI using OpenAI via Cerebras
+   VERCEL_AI_OPENAI_API_KEY=your_cerebras_key
+   VERCEL_AI_OPENAI_BASE_URL=https://api.cerebras.ai/openai/v1
+   # For OpenAI Dev Tools using direct OpenAI
+   OPENAI_DEV_OPENAI_API_KEY=your_openai_key
+   OPENAI_DEV_OPENAI_BASE_URL=https://api.openai.com/v1
+   ```
+
+#### Providers and API Keys
+
+##### OpenAI (used by Vercel AI and OpenAI Dev Tools)
+- Used for: default AI analysis, structured dev insights
+- Set (env):
+  - `OPENAI_API_KEY` (generic)
+  - Or provider‑scoped: `OPENAI_DEV_OPENAI_API_KEY`, `VERCEL_AI_OPENAI_API_KEY`
+  - Optional base URL: `OPENAI_BASE_URL` (generic) or `OPENAI_DEV_OPENAI_BASE_URL`, `VERCEL_AI_OPENAI_BASE_URL`
+- Get key: platform.openai.com/api-keys
+
+##### Cerebras (OpenAI‑compatible endpoint)
+- Used for: high‑throughput, large‑context OpenAI‑compatible calls (route OpenAI traffic through Cerebras)
+- Set (env):
+  - `VERCEL_AI_OPENAI_API_KEY` = your Cerebras key
+  - `VERCEL_AI_OPENAI_BASE_URL` = `https://api.cerebras.ai/openai/v1` (example)
+  - Optionally scope for `openai-dev` similarly
+- Get key: Cerebras Cloud (see announcements; endpoint is OpenAI‑compatible)
+- Note: you can keep OpenAI and Cerebras side‑by‑side by scoping keys per provider; no manual switching needed
+
+##### Anthropic (optional)
+- Used for: Vercel AI path to Claude models
+- Set (env): `ANTHROPIC_API_KEY` or `VERCEL_AI_ANTHROPIC_API_KEY`
+- Get key: console.anthropic.com
+
+Alternatively, create a provider‑specific keys file to avoid changing env vars:
+
+```json
+// .letsfixthis.keys.json
+{
+  "providers": {
+    "vercel-ai": {
+      "openai": {
+        "apiKey": "cerebras-key",
+        "baseURL": "https://api.cerebras.ai/openai/v1"
+      },
+      "anthropic": {
+        "apiKey": "anthropic-key"
+      }
+    },
+    "openai-dev": {
+      "apiKey": "openai-key",
+      "baseURL": "https://api.openai.com/v1"
+    },
+    "cerebrus": {
+      "apiKey": "cerebrus-key",
+      "endpoint": "https://api.cerebrus.ai"
+    }
+  }
+}
+```
 
 ### NPM (Recommended)
 ```bash
@@ -41,28 +123,20 @@ npm link  # For global installation
 docker run -p 8090:8090 haybaler/letsfixthis:latest
 ```
 
-### 2. Install Browser Extension
+### 2. Extension-Free Setup
+LetsfixThis no longer requires a browser extension. Everything works directly from your CLI, HTTP API, or WebSocket.
 
-#### Option A: Chrome Web Store (Recommended)
-*Coming soon!* The extension will be available in the Chrome Web Store for easy installation.
+### 3. Quick Start (No Extension)
+```bash
+# Start the server
+letsfixthis start
 
-#### Option B: Manual Installation
-1. Open Chrome/Edge and go to `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `extension/` folder from the project
-4. The extension icon should appear in your browser toolbar
+# Capture current logs
+letsfixthis capture
 
-**Note**: The Chrome Web Store version is in review. For now, use manual installation.
-
-### 3. Configure Extension (Optional)
-
-By default, the extension connects to `http://localhost:8090`. To use a different server:
-
-1. Click the extension icon and then click "⚙️ Settings"
-2. Enter your server URL (e.g., `http://192.168.1.100:8090` or `https://my-server.com:8090`)
-3. Click "Save Settings" and test the connection
-
-The extension supports any host - local, network, or remote servers with auto-discovery.
+# Analyze with AI
+letsfixthis analyze --format detailed
+```
 
 ## 🔧 Usage
 
@@ -106,6 +180,26 @@ letsfixthis agent-info --agent cursor
 letsfixthis agent-info --agent claude
 letsfixthis agent-info --agent copilot
 letsfixthis agent-info --agent windsurfer
+
+# Use specific AI providers
+letsfixthis agent-info --agent cursor --ai-provider vercel-ai
+letsfixthis agent-info --agent claude --ai-provider cerebrus
+letsfixthis agent-info --agent copilot --ai-provider openai-dev
+```
+
+### AI Analysis
+
+```bash
+# Analyze logs with all available AI providers
+letsfixthis analyze
+
+# Use specific AI provider
+letsfixthis analyze --provider vercel-ai
+letsfixthis analyze --provider cerebrus
+letsfixthis analyze --provider openai-dev
+
+# Get detailed analysis output
+letsfixthis analyze --format detailed
 ```
 
 ## 🤖 AI Agent Support
@@ -134,31 +228,37 @@ letsfixthis agent-info --agent windsurfer
 ```
 Browser state format optimized for web development workflows.
 
-## 🌐 Browser Extension
+## 🧠 AI Provider Integration
 
-The browser extension automatically:
-- Captures all console output (logs, warnings, errors)
-- Intercepts network errors
-- Handles unhandled promise rejections
-- Shows connection status indicator
-- Queues logs when server is offline
-- Allows configuring server URL and auth token
-  - Token is sent as `Authorization: Bearer <token>` for HTTP requests and as a query parameter for WebSocket connections
+### Vercel AI SDK
+- **Unified Interface**: Single API for multiple AI models
+- **Streaming Support**: Real-time AI analysis
+- **Multiple Models**: OpenAI GPT-4, Claude, and more
+- **Usage**: `letsfixthis analyze --provider vercel-ai`
 
-### Extension Features
-- ✅ Real-time connection status
-- 🔄 Automatic reconnection
-- 📊 Log statistics in popup
-- 🧪 Test log generation
-- 📤 Export functionality
-- 🔑 Custom server URL and auth token settings
-  - Use the popup to set the server address and optional token
-  - The auth token is added as a Bearer header when communicating with the CLI
+### Cerebras
+- **Specialized Debugging**: AI focused on code debugging
+- **Runtime Analysis**: Deep analysis of console errors
+- **Code Fixes**: Specific code suggestions
+- **Usage**: `letsfixthis analyze --provider cerebrus`
+
+### OpenAI Dev Tools
+- **Developer Focused**: Built for development workflows
+- **Function Calling**: Structured analysis with tools
+- **Best Practices**: Code quality recommendations
+- **Usage**: `letsfixthis analyze --provider openai-dev`
+
+## 🌐 Input Methods (No Extension)
+
+Use any of these methods to send logs:
+- CLI commands (`letsfixthis add-log`, `import-logs`)
+- HTTP REST API (`POST /api/logs`)
+- WebSocket (send JSON-encoded logs)
 
 ## 🔌 API Endpoints
 
 ### WebSocket
-- `ws://[your-server]:8080` - Real-time log streaming
+- `ws://[your-server]:8090` - Real-time log streaming
 
 ### HTTP REST API
 
@@ -181,11 +281,18 @@ All endpoints support the `Authorization: Bearer <token>` header for authenticat
   - **Description**: Get agent-specific formatted data.
   - **URL Parameters**:
     - `agent`: The target AI agent (e.g., `cursor`, `claude`, `copilot`, `windsurfer`).
+    - `ai_provider`: AI provider to use (e.g., `vercel-ai`, `cerebrus`, `openai-dev`, `auto`).
   - **Response**: `200 OK` - A JSON object formatted for the specified agent.
+
+- `GET /api/analyze`
+  - **Description**: Analyze console logs with AI providers.
+  - **URL Parameters**:
+    - `provider`: AI provider to use (e.g., `vercel-ai`, `cerebrus`, `openai-dev`, `all`).
+  - **Response**: `200 OK` - AI analysis results.
 
 - `GET /api/discovery`
     - **Description**: Discover the `letsfixthis` service on the network.
-    - **Response**: `200 OK` - A JSON object with service details.
+    - **Response**: `200 OK` - A JSON object with service details and available AI providers.
 
 Replace `[your-server]` with your actual server address (e.g., `localhost`, `192.168.1.100`, `my-server.com`)
 
@@ -277,12 +384,43 @@ src/
 └── types/
     └── index.ts          # TypeScript definitions
 
-extension/
-├── manifest.json         # Extension manifest
-├── content-script.js     # Console capture script
-├── background.js         # Background service worker
-├── popup.html           # Extension popup UI
-└── popup.js             # Popup functionality
+// Browser extension removed in v3.1.0
+```
+
+### Quick Start Diagram
+```mermaid
+flowchart TD
+  A[Your App / Tests] -->|console logs| B[CLI / HTTP / WS]
+  B --> C[letsfixthis server]
+  C --> D[Log storage]
+  C --> E[AI Provider Manager]
+  E --> F[Vercel AI]
+  E --> G[Cerebrus]
+  E --> H[OpenAI Dev Tools]
+  C --> I[Agent Info / Analysis Output]
+```
+
+### Features Overview
+```mermaid
+mindmap
+  root((LetsfixThis))
+    Capture
+      CLI
+      HTTP API
+      WebSocket
+    Analyze
+      Vercel AI SDK
+      Cerebrus
+      OpenAI Dev Tools
+    Output
+      JSON
+      Text
+      Structured
+    Integrations
+      Cursor
+      Claude
+      Copilot
+      Windsurfer
 ```
 
 ## 🔧 Configuration

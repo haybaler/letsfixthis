@@ -40,12 +40,10 @@ HOST=${HOST:-0.0.0.0}
 # Start the server
 echo "🚀 Starting Dev Console CLI Bridge server..."
 echo ""
-echo "📋 Instructions:"
-echo "1. Install the browser extension from the 'extension/' folder"
-echo "2. Configure the extension to connect to your server URL"
-echo "3. Open the demo page: file://$(pwd)/demo.html"
-echo "4. Open another terminal and run: node dist/cli.js capture"
-echo "5. Or try: node dist/cli.js agent-info --agent cursor"
+echo "📋 Quick Start:"
+echo "1. Open the AI demo page: file://$(pwd)/demo-ai.html"
+echo "2. In another terminal run: node dist/cli.js capture"
+echo "3. Or analyze with AI: node dist/cli.js analyze --format detailed"
 echo ""
 
 if [ "$HOST" = "0.0.0.0" ]; then

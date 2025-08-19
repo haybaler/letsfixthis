@@ -34,10 +34,9 @@ Thank you for your interest in contributing to the Dev Console CLI Bridge! This 
    node dist/cli.js --help
    ```
 
-5. **Load the browser extension**
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the `extension/` folder
+5. **Run the server and demo (no extension)**
+   - `npm run build && node dist/cli.js start`
+   - Open `demo-ai.html` in your browser
 
 ## 🛠️ Development Workflow
 
@@ -50,7 +49,6 @@ Thank you for your interest in contributing to the Dev Console CLI Bridge! This 
 
 2. **Make your changes**
    - Edit TypeScript files in `src/`
-   - Update browser extension in `extension/`
    - Add tests if applicable
 
 3. **Build and test**
@@ -60,7 +58,7 @@ Thank you for your interest in contributing to the Dev Console CLI Bridge! This 
    ```
 
 4. **Test with the demo page**
-   Open `demo.html` in your browser to test the extension
+   Open `demo-ai.html` in your browser to test AI features
 
 ### Code Style
 
@@ -85,15 +83,12 @@ Example: `feat: add support for custom WebSocket ports`
 
 ### Manual Testing
 1. Start the server: `./start.sh`
-2. Open `demo.html` in your browser
+2. Open `demo-ai.html` in your browser
 3. Click test buttons to generate logs
 4. Verify logs are captured: `node dist/cli.js capture`
 
 ### Browser Extension Testing
-1. Install the extension in developer mode
-2. Navigate to any website
-3. Open developer console and generate logs
-4. Check if logs appear in the CLI
+Removed in v3.1.0 — use CLI, HTTP API, or WebSocket.
 
 ### AI Agent Integration Testing
 ```bash

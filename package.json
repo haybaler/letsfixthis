@@ -1,7 +1,7 @@
 {
   "name": "letsfixthis",
-  "version": "2.1.1",
-  "description": "CLI tool to capture browser dev console output for AI coding agents like Cursor, Claude Code, GitHub Copilot, and Windsurfer",
+  "version": "3.0.0",
+  "description": "AI-powered CLI tool to capture and analyze browser console output with Vercel AI SDK, Cerebrus, and OpenAI Dev Tools integration",
   "main": "dist/cli.js",
   "bin": {
     "letsfixthis": "./dist/cli.js"
@@ -14,8 +14,7 @@
     "test:ci": "npm run build && jest --passWithNoTests",
     "watch": "nodemon --exec ts-node src/cli.ts",
     "prepublishOnly": "npm run build",
-    "extension:zip": "cd extension && zip -r ../letsfixthis-extension.zip . -x '*.DS_Store'",
-    "version:bump": "npm version patch && npm run extension:zip"
+    "version:bump": "npm version patch"
   },
   "keywords": [
     "cli",
@@ -27,12 +26,15 @@
     "copilot",
     "windsurfer",
     "debugging",
-    "browser-extension",
+    
     "websocket",
     "logging",
     "development",
     "ai-assistant",
-    "devtools"
+    "devtools",
+    "vercel-ai",
+    "cerebrus",
+    "openai"
   ],
   "author": "Joshua Haydon",
   "license": "MIT",
@@ -50,10 +52,13 @@
   },
   "files": [
     "dist/**/*",
-    "extension/**/*",
+    
     "README.md",
     "LICENSE",
-    "demo.html"
+    "demo-ai.html",
+    "ai-agent-simple.js",
+    "AI_AGENT_GUIDE.md",
+    "env.example"
   ],
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -71,6 +76,13 @@
     "commander": "^14.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "ai": "^3.0.0",
+    "openai": "^4.0.0",
+    "@anthropic-ai/sdk": "^0.18.0",
+    "zod": "^3.22.0",
+    "dotenv": "^16.3.0",
+    "chokidar": "^3.5.3",
+    "node-fetch": "^3.3.2"
   }
 }

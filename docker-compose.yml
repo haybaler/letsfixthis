@@ -10,9 +10,7 @@ services:
       - PORT=${PORT:-8080}
       - HOST=${HOST:-0.0.0.0}
     volumes:
-      # Mount extension files for development
-      - ./extension:/app/extension:ro
-      - ./demo.html:/app/demo.html:ro
+      - ./demo-ai.html:/app/demo-ai.html:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:' + process.env.PORT + '/api/logs', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
@@ -28,8 +26,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./demo.html:/usr/share/nginx/html/demo.html:ro
-      - ./extension:/usr/share/nginx/html/extension:ro
+      - ./demo-ai.html:/usr/share/nginx/html/demo-ai.html:ro
     depends_on:
       - dev-console-cli
     restart: unless-stopped

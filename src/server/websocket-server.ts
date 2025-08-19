@@ -7,6 +7,13 @@ import { LogCapture } from '../capture/log-capture';
 import { OutputFormatter } from '../output/formatter';
 import { ServiceDiscovery } from './discovery';
 import { generateSuggestions } from '../suggestions';
+import { AIProviderManager } from '../ai/ai-provider';
+import { VercelAIProvider } from '../ai/vercel-ai-provider';
+import { CerebrusProvider } from '../ai/cerebrus-provider';
+import { OpenAIDevProvider } from '../ai/openai-dev-provider';
+import { CodebaseAnalyzer } from './codebase-analyzer';
+import { KnowledgeStore } from './knowledge-store';
+import { GithubScanner } from './github-scanner';
 
 export class DevConsoleServer {
   private wss: WebSocket.Server | null = null;
@@ -15,6 +22,9 @@ export class DevConsoleServer {
   private logCapture: LogCapture;
   private formatter: OutputFormatter;
   private options: ServerOptions;
+  private aiManager: AIProviderManager;
+  private codeAnalyzer: CodebaseAnalyzer;
+  private knowledge: KnowledgeStore;
 
   constructor(options: ServerOptions) {
     this.options = options;
@@ -22,7 +32,15 @@ export class DevConsoleServer {
     this.logCapture = new LogCapture(options.logFile);
     this.formatter = new OutputFormatter(options.format);
     
+    // Initialize AI providers
+    this.aiManager = new AIProviderManager();
+    this.aiManager.registerProvider(new VercelAIProvider());
+    this.aiManager.registerProvider(new CerebrusProvider());
+    this.aiManager.registerProvider(new OpenAIDevProvider());
+    
     this.setupExpress();
+    this.codeAnalyzer = new CodebaseAnalyzer({ rootDir: process.cwd() });
+    this.knowledge = new KnowledgeStore();
   }
 
   private setupExpress(): void {
@@ -30,10 +48,7 @@ export class DevConsoleServer {
     this.app.use(cors(corsOptions));
     this.app.use(express.json());
 
-    // Serve the browser extension files
-    this.app.use('/extension', express.static('extension'));
-    
-    // Serve demo.html
+    // Serve static demo and assets from project root
     this.app.use(express.static('.'));
 
     // Authentication middleware function
@@ -82,7 +97,23 @@ export class DevConsoleServer {
     this.app.get('/api/agent-info/:agent', authenticate, async (req, res) => {
       try {
         const logs = await this.logCapture.getCurrentLogs();
-        const agentInfo = this.generateAgentInfo(logs, req.params.agent);
+        const aiProvider = req.query.ai_provider as string || 'auto';
+        
+        let agentInfo: any;
+        
+        if (aiProvider === 'auto') {
+          const analysis = await this.aiManager.getBestAnalysis(logs);
+          agentInfo = this.generateAgentInfo(logs, req.params.agent, analysis);
+        } else {
+          const provider = this.aiManager.getProvider(aiProvider);
+          if (provider && provider.isAvailable()) {
+            const formatted = await provider.formatForAgent(logs, req.params.agent);
+            agentInfo = JSON.parse(formatted);
+          } else {
+            agentInfo = this.generateAgentInfo(logs, req.params.agent);
+          }
+        }
+        
         res.json(agentInfo);
       } catch (error) {
         res.status(500).json({ error: 'Failed to generate agent info' });
@@ -95,8 +126,116 @@ export class DevConsoleServer {
         service: 'letsfixthis',
         version: '1.0.0',
         port: this.options.port,
-        host: this.options.host || '0.0.0.0'
+        host: this.options.host || '0.0.0.0',
+        ai_providers: this.aiManager.getAvailableProviders()
       });
+    });
+
+    // AI analysis endpoint
+    this.app.get('/api/analyze', authenticate, async (req, res) => {
+      try {
+        const logs = await this.logCapture.getCurrentLogs();
+        const provider = req.query.provider as string || 'all';
+        
+        if (provider === 'all') {
+          const analyses = await this.aiManager.analyzeWithAll(logs);
+          res.json({
+            timestamp: new Date().toISOString(),
+            total_logs: logs.length,
+            analyses: Object.fromEntries(analyses)
+          });
+        } else {
+          const aiProvider = this.aiManager.getProvider(provider);
+          if (!aiProvider || !aiProvider.isAvailable()) {
+            res.status(400).json({ error: `AI provider '${provider}' not available` });
+            return;
+          }
+          
+          const analysis = await aiProvider.analyze(logs);
+          res.json(analysis);
+        }
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to analyze logs' });
+      }
+    });
+
+    // Codebase guardrails endpoints (v1)
+    this.app.post('/api/code/analyze', authenticate, (req, res) => {
+      const { files } = req.body || {};
+      if (!files || !Array.isArray(files)) {
+        res.status(400).json({ error: 'Missing files array' });
+        return;
+      }
+      const summaries = this.codeAnalyzer.summarizeChanged(files);
+      this.knowledge.upsertMany(summaries);
+      res.json({ summaries });
+    });
+
+    this.app.post('/api/code/watch', authenticate, (req, res) => {
+      this.codeAnalyzer.startWatching((changed) => {
+        const summaries = this.codeAnalyzer.summarizeChanged(changed);
+        this.knowledge.upsertMany(summaries);
+        // In future, forward to Cerebrus/OpenAI for deep analysis
+        console.log('Code changed:', summaries.map(s => s.filePath));
+      });
+      res.json({ watching: true });
+    });
+
+    this.app.get('/api/code/knowledge', authenticate, (_req, res) => {
+      res.json({ stats: this.knowledge.getStats(), files: this.knowledge.getAll() });
+    });
+
+    this.app.get('/api/code/graph', authenticate, (_req, res) => {
+      res.json({ graph: this.knowledge.getDependencyGraph() });
+    });
+    this.app.post('/api/guardrails/validate-plan', authenticate, (req, res) => {
+      const { plan, files } = req.body || {};
+      if (!plan) {
+        res.status(400).json({ error: 'Missing plan' });
+        return;
+      }
+      // Minimal heuristic validation; future: integrate deep provider
+      const risks: string[] = [];
+      if (/delete\s+database|drop\s+table/i.test(plan)) risks.push('Potential destructive database operation');
+      if (/remove\s+auth|disable\s+auth/i.test(plan)) risks.push('Potential security/authentication risk');
+      const score = Math.min(1, risks.length * 0.3);
+      res.json({ ok: risks.length === 0, risk_score: score, risks, mitigations: [] });
+    });
+
+    this.app.post('/api/guardrails/validate-diff', authenticate, (req, res) => {
+      const { diff, files } = req.body || {};
+      if (!diff) {
+        res.status(400).json({ error: 'Missing diff' });
+        return;
+      }
+      const risks: string[] = [];
+      if (/console\.log\(/.test(diff)) risks.push('Debug statements left in code');
+      if (/any\b/.test(diff)) risks.push('Loosening TypeScript types with any');
+      const score = Math.min(1, risks.length * 0.2);
+      res.json({ ok: risks.length === 0, risk_score: score, risks, mitigations: [] });
+    });
+
+    this.app.get('/api/github/diff', authenticate, (_req, res) => {
+      const diff = GithubScanner.getLocalDiff();
+      res.json(diff);
+    });
+
+    // Code review endpoint (Cerebrus)
+    this.app.post('/api/code/review', authenticate, async (req, res) => {
+      try {
+        const { diff, plan, files } = req.body || {};
+        const summaries = files && Array.isArray(files) ? this.codeAnalyzer.summarizeChanged(files) : [];
+        const cerebrus = this.aiManager.getProvider('cerebrus') as any;
+        if (!cerebrus || !cerebrus.isAvailable || !cerebrus.isAvailable()) {
+          res.status(400).json({ error: 'Cerebrus provider not available' });
+          return;
+        }
+        const review = await cerebrus.analyzeCodeReview({ summaries, diff, plan });
+        this.knowledge.addReview({ review, diffLength: (diff||'').length, files: files?.length || 0 });
+        res.json(review);
+      } catch (e) {
+        res.status(500).json({ error: 'Review failed' });
+      }
     });
   }
 
@@ -142,7 +281,7 @@ export class DevConsoleServer {
     });
 
     this.wss.on('connection', (ws, req) => {
-      console.log('🔌 Browser extension connected');
+      console.log('🔌 WebSocket client connected');
       
       ws.on('message', (data) => {
         try {
@@ -158,7 +297,7 @@ export class DevConsoleServer {
       });
       
       ws.on('close', () => {
-        console.log('🔌 Browser extension disconnected');
+        console.log('🔌 WebSocket client disconnected');
       });
     });
   }
@@ -173,8 +312,8 @@ export class DevConsoleServer {
     }
   }
 
-  private generateAgentInfo(logs: ConsoleLog[], agent: string): any {
-    return {
+  private generateAgentInfo(logs: ConsoleLog[], agent: string, analysis?: any): any {
+    const baseInfo = {
       timestamp: new Date().toISOString(),
       agent,
       console_data: {
@@ -186,6 +325,15 @@ export class DevConsoleServer {
       },
       suggestions: this.generateSuggestions(logs)
     };
+
+    if (analysis) {
+      return {
+        ...baseInfo,
+        ai_analysis: analysis
+      };
+    }
+
+    return baseInfo;
   }
 
   private generateSuggestions(logs: ConsoleLog[]): string[] {

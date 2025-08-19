@@ -6,11 +6,25 @@ import { LogCapture } from './capture/log-capture';
 import { OutputFormatter } from './output/formatter';
 import { ConsoleLog } from './types';
 import { generateSuggestions } from './suggestions';
+import { AIProviderManager } from './ai/ai-provider';
+import { VercelAIProvider } from './ai/vercel-ai-provider';
+import { CerebrusProvider } from './ai/cerebrus-provider';
+import { OpenAIDevProvider } from './ai/openai-dev-provider';
 import { version } from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const program = new Command();
+
+// Initialize AI providers
+const aiManager = new AIProviderManager();
+aiManager.registerProvider(new VercelAIProvider());
+aiManager.registerProvider(new CerebrusProvider());
+aiManager.registerProvider(new OpenAIDevProvider());
 
 program
   .name('letsfixthis')
@@ -66,8 +80,8 @@ program
     
     await server.start();
     const displayHost = configHost === '0.0.0.0' ? 'all interfaces' : configHost;
-    console.log(`📡 LetsfixThis capture server running on ${displayHost}:${configPort}`);
-    console.log('📋 Browser extension ready - refresh your page to start capturing console logs');
+    console.log(`📡 LetsfixThis server running on ${displayHost}:${configPort}`);
+    console.log('📋 Send logs via CLI (add-log/import-logs), HTTP POST /api/logs, or WebSocket');
     
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
@@ -80,6 +94,59 @@ program
       await server.stop();
       process.exit(0);
     });
+  });
+
+program
+  .command('watch')
+  .description('Watch the repository and analyze changes')
+  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    const fetch = (await import('node-fetch')).default as any;
+    try {
+      const resp = await fetch(`${options.server}/api/code/watch`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      console.log(JSON.stringify(await resp.json(), null, 2));
+    } catch (e) {
+      console.error('Failed to start watcher:', e);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('knowledge')
+  .description('Show knowledge store summary')
+  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    const fetch = (await import('node-fetch')).default as any;
+    const resp = await fetch(`${options.server}/api/code/knowledge`);
+    console.log(JSON.stringify(await resp.json(), null, 2));
+  });
+
+program
+  .command('graph')
+  .description('Show dependency graph')
+  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    const fetch = (await import('node-fetch')).default as any;
+    const resp = await fetch(`${options.server}/api/code/graph`);
+    console.log(JSON.stringify(await resp.json(), null, 2));
+  });
+
+program
+  .command('review')
+  .description('Run Cerebrus code review on a diff/plan')
+  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .option('--diff <file>', 'Unified diff file')
+  .option('--plan <file>', 'Plan/description file')
+  .option('--files <list>', 'Comma-separated files to summarize')
+  .action(async (options) => {
+    const fetch = (await import('node-fetch')).default as any;
+    const fs = await import('fs');
+    const body: any = {};
+    if (options.diff) body.diff = fs.readFileSync(options.diff, 'utf8');
+    if (options.plan) body.plan = fs.readFileSync(options.plan, 'utf8');
+    if (options.files) body.files = String(options.files).split(',').map((s: string) => s.trim());
+    const resp = await fetch(`${options.server}/api/code/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    console.log(JSON.stringify(await resp.json(), null, 2));
   });
 
 program
@@ -113,24 +180,60 @@ program
   .description('Get formatted info for AI agents')
   .option('-a, --agent <agent>', 'Target agent (cursor|claude|copilot|windsurfer)', 'cursor')
   .option('-l, --log-file <file>', 'Path to log file')
+  .option('--ai-provider <provider>', 'AI provider (vercel-ai|cerebrus|openai-dev|auto)', 'auto')
   .action(async (options) => {
     const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     const logs = await capture.getCurrentLogs();
     
-    const agentInfo = {
-      timestamp: new Date().toISOString(),
-      agent: options.agent,
-      console_data: {
-        errors: logs.filter((log: ConsoleLog) => log.level === 'error'),
-        warnings: logs.filter((log: ConsoleLog) => log.level === 'warn'),
-        logs: logs.filter((log: ConsoleLog) => log.level === 'log'),
-        network_errors: logs.filter((log: ConsoleLog) => log.type === 'network'),
-        stack_traces: logs.filter((log: ConsoleLog) => log.stack).map((log: ConsoleLog) => log.stack)
-      },
-      suggestions: generateSuggestions(logs)
-    };
+    let formattedOutput: string;
     
-    console.log(JSON.stringify(agentInfo, null, 2));
+    if (options.aiProvider === 'auto') {
+      // Use the best available AI provider
+      const analysis = await aiManager.getBestAnalysis(logs);
+      if (analysis) {
+        const agentInfo = {
+          timestamp: new Date().toISOString(),
+          agent: options.agent,
+          ai_analysis: analysis,
+          console_data: {
+            errors: logs.filter((log: ConsoleLog) => log.level === 'error'),
+            warnings: logs.filter((log: ConsoleLog) => log.level === 'warn'),
+            logs: logs.filter((log: ConsoleLog) => log.level === 'log'),
+            network_errors: logs.filter((log: ConsoleLog) => log.type === 'network'),
+            stack_traces: logs.filter((log: ConsoleLog) => log.stack).map((log: ConsoleLog) => log.stack)
+          },
+          suggestions: generateSuggestions(logs)
+        };
+        formattedOutput = JSON.stringify(agentInfo, null, 2);
+      } else {
+        // Fallback to original format
+        const agentInfo = {
+          timestamp: new Date().toISOString(),
+          agent: options.agent,
+          console_data: {
+            errors: logs.filter((log: ConsoleLog) => log.level === 'error'),
+            warnings: logs.filter((log: ConsoleLog) => log.level === 'warn'),
+            logs: logs.filter((log: ConsoleLog) => log.level === 'log'),
+            network_errors: logs.filter((log: ConsoleLog) => log.type === 'network'),
+            stack_traces: logs.filter((log: ConsoleLog) => log.stack).map((log: ConsoleLog) => log.stack)
+          },
+          suggestions: generateSuggestions(logs)
+        };
+        formattedOutput = JSON.stringify(agentInfo, null, 2);
+      }
+    } else {
+      // Use specific AI provider
+      const provider = aiManager.getProvider(options.aiProvider);
+      if (provider && provider.isAvailable()) {
+        formattedOutput = await provider.formatForAgent(logs, options.agent);
+      } else {
+        console.error(`❌ AI provider '${options.aiProvider}' not available`);
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        process.exit(1);
+      }
+    }
+    
+    console.log(formattedOutput);
   });
 
 program
@@ -141,6 +244,113 @@ program
     const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     await capture.clearLogs();
     console.log('🗑️  Logs cleared');
+  });
+
+program
+  .command('analyze')
+  .description('Analyze console logs with AI providers')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .option('--provider <provider>', 'AI provider (vercel-ai|cerebrus|openai-dev|all)', 'all')
+  .option('-f, --format <format>', 'Output format (json|text|detailed)', 'json')
+  .action(async (options) => {
+    const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
+    const logs = await capture.getCurrentLogs();
+    
+    console.log(`🔍 Analyzing ${logs.length} console logs...`);
+    
+    if (options.provider === 'all') {
+      const analyses = await aiManager.analyzeWithAll(logs);
+      
+      if (analyses.size === 0) {
+        console.log('❌ No AI providers available. Please configure API keys.');
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      if (options.format === 'detailed') {
+        console.log('\n📊 AI Analysis Results:\n');
+        for (const [provider, analysis] of analyses) {
+          console.log(`🤖 ${provider.toUpperCase()}:`);
+          console.log(`   Summary: ${analysis.summary}`);
+          console.log(`   Priority: ${analysis.priority.toUpperCase()}`);
+          console.log(`   Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
+          console.log(`   Suggestions: ${analysis.suggestions.length}`);
+          if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+            console.log(`   Code Fixes: ${analysis.codeFixes.length}`);
+          }
+          console.log('');
+        }
+      } else {
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          total_logs: logs.length,
+          analyses: Object.fromEntries(analyses)
+        }, null, 2));
+      }
+    } else {
+      const provider = aiManager.getProvider(options.provider);
+      if (!provider || !provider.isAvailable()) {
+        console.error(`❌ AI provider '${options.provider}' not available`);
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      const analysis = await provider.analyze(logs);
+      
+      if (options.format === 'detailed') {
+        console.log(`\n🤖 ${options.provider.toUpperCase()} Analysis:\n`);
+        console.log(`Summary: ${analysis.summary}`);
+        console.log(`Priority: ${analysis.priority.toUpperCase()}`);
+        console.log(`Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
+        console.log('\nSuggestions:');
+        analysis.suggestions.forEach((suggestion, index) => {
+          console.log(`  ${index + 1}. ${suggestion}`);
+        });
+        if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+          console.log('\nCode Fixes:');
+          analysis.codeFixes.forEach((fix, index) => {
+            console.log(`  ${index + 1}. ${fix}`);
+          });
+        }
+        if (analysis.explanations && analysis.explanations.length > 0) {
+          console.log('\nExplanations:');
+          analysis.explanations.forEach((explanation, index) => {
+            console.log(`  ${index + 1}. ${explanation}`);
+          });
+        }
+      } else {
+        console.log(JSON.stringify(analysis, null, 2));
+      }
+    }
+  });
+
+program
+  .command('guardrails')
+  .description('Validate plans or diffs against guardrails')
+  .option('--plan <file>', 'Path to a plan file (markdown/text)')
+  .option('--diff <file>', 'Path to a unified diff/patch file')
+  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    const fetch = (await import('node-fetch')).default as any;
+    try {
+      if (options.plan) {
+        const plan = require('fs').readFileSync(options.plan, 'utf8');
+        const resp = await fetch(`${options.server}/api/guardrails/validate-plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) });
+        console.log(JSON.stringify(await resp.json(), null, 2));
+        return;
+      }
+      if (options.diff) {
+        const diff = require('fs').readFileSync(options.diff, 'utf8');
+        const resp = await fetch(`${options.server}/api/guardrails/validate-diff`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diff }) });
+        console.log(JSON.stringify(await resp.json(), null, 2));
+        return;
+      }
+      console.error('Provide --plan or --diff');
+      process.exit(1);
+    } catch (e) {
+      console.error('Guardrails validation failed:', e);
+      process.exit(1);
+    }
   });
 
 program.parse();
