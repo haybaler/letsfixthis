@@ -1,0 +1,27 @@
+{
+  "filePath": "/Users/joshuahaydon/letsfixthis-1/src/server/websocket-server.ts",
+  "size": 12308,
+  "hash": "12fc4f52fe972c83c2b7167823c4aee5c5517ab7",
+  "imports": [
+    "ws",
+    "http",
+    "express",
+    "cors",
+    "../../package.json",
+    "../types",
+    "../capture/log-capture",
+    "../output/formatter",
+    "./discovery",
+    "../suggestions",
+    "../ai/ai-provider",
+    "../ai/vercel-ai-provider",
+    "../ai/cerebrus-provider",
+    "../ai/openai-dev-provider",
+    "./codebase-analyzer",
+    "./knowledge-store",
+    "./github-scanner"
+  ],
+  "exports": [
+    "DevConsoleServer"
+  ]
+}

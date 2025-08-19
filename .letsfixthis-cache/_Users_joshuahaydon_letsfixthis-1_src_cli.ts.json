@@ -1,0 +1,22 @@
+{
+  "filePath": "/Users/joshuahaydon/letsfixthis-1/src/cli.ts",
+  "size": 19704,
+  "hash": "f7ad1df7583bd62f51c10a03c0c78ecd3b714a6e",
+  "imports": [
+    "commander",
+    "./server/websocket-server",
+    "./capture/log-capture",
+    "./output/formatter",
+    "./types",
+    "./suggestions",
+    "./ai/ai-provider",
+    "./ai/vercel-ai-provider",
+    "./ai/cerebrus-provider",
+    "./ai/openai-dev-provider",
+    "../package.json",
+    "fs",
+    "path",
+    "dotenv"
+  ],
+  "exports": []
+}

@@ -2,6 +2,7 @@ import * as WebSocket from 'ws';
 import * as http from 'http';
 import express from 'express';
 import cors from 'cors';
+import { version as pkgVersion } from '../../package.json';
 import { ConsoleLog, ServerOptions } from '../types';
 import { LogCapture } from '../capture/log-capture';
 import { OutputFormatter } from '../output/formatter';
@@ -124,7 +125,7 @@ export class DevConsoleServer {
     this.app.get('/api/discovery', (req, res) => {
       res.json({
         service: 'letsfixthis',
-        version: '1.0.0',
+        version: pkgVersion,
         port: this.options.port,
         host: this.options.host || '0.0.0.0',
         ai_providers: this.aiManager.getAvailableProviders()

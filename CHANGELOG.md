@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1] - 2025-08-19
+
+### Fixed
+- CLI: Added missing extension-free commands `add-log`, `import-logs`, `interactive`, and `analyze-direct`.
+- CLI: Replaced `node-fetch` usage with Node's global `fetch` to avoid ESM import errors.
+- Server: `/api/discovery` now returns the real package version instead of a hardcoded value.
+
 ## [3.1.0] - 2025-08-19
 
 ### Removed

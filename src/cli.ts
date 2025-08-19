@@ -325,13 +325,172 @@ program
   });
 
 program
+  .command('add-log')
+  .description('Add a log entry directly via CLI')
+  .option('-m, --message <message>', 'Log message')
+  .option('-l, --level <level>', 'Log level (log|warn|error|info|debug)', 'log')
+  .option('-f, --file <file>', 'Source file')
+  .option('-n, --line <line>', 'Line number')
+  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    try {
+      const logEntry = {
+        message: options.message,
+        level: options.level,
+        timestamp: new Date().toISOString(),
+        source: {
+          file: options.file,
+          line: options.line ? parseInt(options.line) : undefined
+        }
+      };
+      
+      const response = await fetch(`${options.server}/api/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry)
+      });
+      
+      if (response.ok) {
+        console.log('✅ Log added successfully');
+      } else {
+        console.error('❌ Failed to add log:', await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Error adding log:', error);
+    }
+  });
+
+program
+  .command('import-logs')
+  .description('Import logs from a file')
+  .option('-f, --file <file>', 'Log file to import')
+  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    if (!options.file) {
+      console.error('❌ Please specify a file with --file');
+      return;
+    }
+    
+    try {
+      const logData = fs.readFileSync(options.file, 'utf8');
+      const logs = JSON.parse(logData);
+      
+      const response = await fetch(`${options.server}/api/logs/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logs })
+      });
+      
+      if (response.ok) {
+        console.log(`✅ Imported ${logs.length} logs successfully`);
+      } else {
+        console.error('❌ Failed to import logs:', await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Error importing logs:', error);
+    }
+  });
+
+program
+  .command('interactive')
+  .description('Interactive mode for adding logs')
+  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    console.log('🎯 Interactive mode - type "quit" to exit');
+    console.log('Format: <level>:<message> (e.g., error:Something went wrong)');
+    
+    const askQuestion = () => {
+      rl.question('> ', async (input: string) => {
+        if (input.toLowerCase() === 'quit') {
+          rl.close();
+          return;
+        }
+        
+        const [level, ...messageParts] = input.split(':');
+        const message = messageParts.join(':').trim();
+        
+        if (!message) {
+          console.log('❌ Please provide a message');
+          askQuestion();
+          return;
+        }
+        
+        try {
+          const logEntry = {
+            message,
+            level: level || 'log',
+            timestamp: new Date().toISOString()
+          };
+          
+          const response = await fetch(`${options.server}/api/logs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(logEntry)
+          });
+          
+          if (response.ok) {
+            console.log('✅ Log added');
+          } else {
+            console.error('❌ Failed to add log');
+          }
+        } catch (error) {
+          console.error('❌ Error:', error);
+        }
+        
+        askQuestion();
+      });
+    };
+    
+    askQuestion();
+  });
+
+program
+  .command('analyze-direct')
+  .description('Analyze logs directly with AI providers')
+  .option('-p, --provider <provider>', 'AI provider (vercel-ai|cerebrus|openai-dev|all)', 'all')
+  .option('-f, --format <format>', 'Output format (json|detailed)', 'detailed')
+  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
+  .action(async (options) => {
+    try {
+      const response = await fetch(`${options.server}/api/analyze?provider=${options.provider}&format=${options.format}`);
+      const result = await response.json();
+      
+      if (options.format === 'detailed') {
+        console.log('\n🤖 AI Analysis Results:\n');
+        if (result.analyses) {
+          for (const [provider, analysis] of Object.entries(result.analyses)) {
+            console.log(`🤖 ${provider.toUpperCase()}:`);
+            console.log(`   Summary: ${(analysis as any).summary}`);
+            console.log(`   Priority: ${(analysis as any).priority.toUpperCase()}`);
+            console.log(`   Confidence: ${((analysis as any).confidence * 100).toFixed(1)}%`);
+            console.log('');
+          }
+        } else {
+          console.log(`Summary: ${result.summary}`);
+          console.log(`Priority: ${result.priority.toUpperCase()}`);
+          console.log(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+        }
+      } else {
+        console.log(JSON.stringify(result, null, 2));
+      }
+    } catch (error) {
+      console.error('❌ Error analyzing logs:', error);
+    }
+  });
+
+program
   .command('guardrails')
   .description('Validate plans or diffs against guardrails')
   .option('--plan <file>', 'Path to a plan file (markdown/text)')
   .option('--diff <file>', 'Path to a unified diff/patch file')
   .option('--server <url>', 'Server URL', 'http://localhost:8090')
   .action(async (options) => {
-    const fetch = (await import('node-fetch')).default as any;
     try {
       if (options.plan) {
         const plan = require('fs').readFileSync(options.plan, 'utf8');
