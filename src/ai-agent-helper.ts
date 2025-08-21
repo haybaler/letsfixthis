@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 
 import { LogCapture } from './capture/log-capture';
-import { AIProviderManager } from './ai/ai-provider';
-import { VercelAIProvider } from './ai/vercel-ai-provider';
-import { CerebrusProvider } from './ai/cerebrus-provider';
-import { OpenAIDevProvider } from './ai/openai-dev-provider';
+import { AIProviderManager } from './ai';
 import { ConsoleLog } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -13,11 +10,8 @@ import * as dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Initialize AI providers
+// Initialize AI manager (providers are loaded lazily)
 const aiManager = new AIProviderManager();
-aiManager.registerProvider(new VercelAIProvider());
-aiManager.registerProvider(new CerebrusProvider());
-aiManager.registerProvider(new OpenAIDevProvider());
 
 export class AIAgentHelper {
   private capture: LogCapture;
@@ -81,10 +75,11 @@ export class AIAgentHelper {
       return analysis || { message: 'No AI providers available' };
     } else {
       const aiProvider = aiManager.getProvider(provider);
-      if (!aiProvider || !aiProvider.isAvailable()) {
+      const resolvedProvider = await aiProvider;
+      if (!resolvedProvider || !(await resolvedProvider.isAvailable())) {
         return { error: `AI provider '${provider}' not available` };
       }
-      return await aiProvider.analyze(logs);
+      return await resolvedProvider.analyze(logs);
     }
   }
 
@@ -110,10 +105,11 @@ export class AIAgentHelper {
       };
     } else {
       const provider = aiManager.getProvider(aiProvider);
-      if (!provider || !provider.isAvailable()) {
+      const resolvedProvider = await provider;
+      if (!resolvedProvider || !(await resolvedProvider.isAvailable())) {
         return { error: `AI provider '${aiProvider}' not available` };
       }
-      const formatted = await provider.formatForAgent(logs, agent);
+      const formatted = await resolvedProvider.formatForAgent(logs, agent);
       return JSON.parse(formatted);
     }
   }
@@ -180,8 +176,8 @@ export class AIAgentHelper {
   /**
    * Get available AI providers
    */
-  getAvailableProviders(): string[] {
-    return aiManager.getAvailableProviders();
+  async getAvailableProviders(): Promise<string[]> {
+    return await aiManager.getAvailableProviders();
   }
 
   /**

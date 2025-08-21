@@ -8,13 +8,17 @@ import { LogCapture } from '../capture/log-capture';
 import { OutputFormatter } from '../output/formatter';
 import { ServiceDiscovery } from './discovery';
 import { generateSuggestions } from '../suggestions';
-import { AIProviderManager } from '../ai/ai-provider';
-import { VercelAIProvider } from '../ai/vercel-ai-provider';
-import { CerebrusProvider } from '../ai/cerebrus-provider';
-import { OpenAIDevProvider } from '../ai/openai-dev-provider';
-import { CodebaseAnalyzer } from './codebase-analyzer';
-import { KnowledgeStore } from './knowledge-store';
-import { GithubScanner } from './github-scanner';
+import { AIProviderManager } from '../ai';
+import { CodebaseAnalyzer } from './utils/analyzer';
+import { KnowledgeStore } from './utils/knowledge';
+import { GithubScanner } from './utils/github';
+import { analytics } from './utils/analytics';
+import { collaborationManager } from './utils/collaboration';
+import { globalCache } from './utils/cache';
+import { setupLogsAPI } from './api/logs';
+import { setupAnalysisAPI } from './api/analysis';
+import { setupCodebaseAPI } from './api/codebase';
+import { setupAdvancedAPI } from './api/advanced';
 
 export class DevConsoleServer {
   private wss: WebSocket.Server | null = null;
@@ -33,11 +37,8 @@ export class DevConsoleServer {
     this.logCapture = new LogCapture(options.logFile);
     this.formatter = new OutputFormatter(options.format);
     
-    // Initialize AI providers
+    // Initialize AI provider manager (providers are loaded lazily)
     this.aiManager = new AIProviderManager();
-    this.aiManager.registerProvider(new VercelAIProvider());
-    this.aiManager.registerProvider(new CerebrusProvider());
-    this.aiManager.registerProvider(new OpenAIDevProvider());
     
     this.setupExpress();
     this.codeAnalyzer = new CodebaseAnalyzer({ rootDir: process.cwd() });
@@ -65,62 +66,45 @@ export class DevConsoleServer {
       next();
     };
 
-    // API endpoints
-    this.app.get('/api/logs', authenticate, async (req, res) => {
-      try {
-        const logs = await this.logCapture.getCurrentLogs();
-        res.json(logs);
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to get logs' });
+    // Setup modular API endpoints
+    setupLogsAPI(this.app, {
+      logCapture: this.logCapture,
+      options: {
+        watchMode: this.options.watchMode,
+        outputFile: this.options.outputFile
       }
-    });
+    }, authenticate);
 
-    this.app.post('/api/logs', authenticate, (req, res) => {
-      const log: ConsoleLog = req.body;
-      this.logCapture.addLog(log);
-      
-      if (this.options.watchMode) {
-        this.handleNewLog(log);
-      }
-      
-      res.json({ success: true });
-    });
+    setupAnalysisAPI(this.app, {
+      aiManager: this.aiManager,
+      logCapture: this.logCapture
+    }, authenticate);
 
-    this.app.delete('/api/logs', authenticate, async (req, res) => {
-      try {
-        await this.logCapture.clearLogs();
-        res.json({ success: true, message: 'Logs cleared' });
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to clear logs' });
-      }
-    });
+    setupCodebaseAPI(this.app, {
+      codeAnalyzer: this.codeAnalyzer,
+      knowledge: this.knowledge,
+      aiManager: this.aiManager
+    }, authenticate);
 
-    this.app.get('/api/agent-info/:agent', authenticate, async (req, res) => {
-      try {
-        const logs = await this.logCapture.getCurrentLogs();
-        const aiProvider = req.query.ai_provider as string || 'auto';
-        
-        let agentInfo: any;
-        
-        if (aiProvider === 'auto') {
-          const analysis = await this.aiManager.getBestAnalysis(logs);
-          agentInfo = this.generateAgentInfo(logs, req.params.agent, analysis);
-        } else {
-          const provider = this.aiManager.getProvider(aiProvider);
-          if (provider && provider.isAvailable()) {
-            const formatted = await provider.formatForAgent(logs, req.params.agent);
-            agentInfo = JSON.parse(formatted);
-          } else {
-            agentInfo = this.generateAgentInfo(logs, req.params.agent);
-          }
+    setupAdvancedAPI(this.app, {
+      getAnalytics: () => analytics.exportData(),
+      getHealthScore: () => analytics.getHealthScore(),
+      getPerformanceMetrics: () => analytics.getMetrics(),
+      createCollaborationSession: (name: string) => collaborationManager.createSession(name),
+      getCollaborationSessions: () => collaborationManager.getAllSessions(),
+      getSessionInfo: (sessionId: string) => collaborationManager.getSessionInfo(sessionId),
+      getSystemStats: () => ({
+        cache: globalCache.getStats(),
+        analytics: analytics.getMetrics(),
+        system: {
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          cpu: process.cpuUsage()
         }
-        
-        res.json(agentInfo);
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to generate agent info' });
-      }
-    });
-    
+      }),
+      getCacheStats: () => globalCache.getStats()
+    }, authenticate);
+
     // Discovery endpoint
     this.app.get('/api/discovery', (req, res) => {
       res.json({
@@ -130,113 +114,6 @@ export class DevConsoleServer {
         host: this.options.host || '0.0.0.0',
         ai_providers: this.aiManager.getAvailableProviders()
       });
-    });
-
-    // AI analysis endpoint
-    this.app.get('/api/analyze', authenticate, async (req, res) => {
-      try {
-        const logs = await this.logCapture.getCurrentLogs();
-        const provider = req.query.provider as string || 'all';
-        
-        if (provider === 'all') {
-          const analyses = await this.aiManager.analyzeWithAll(logs);
-          res.json({
-            timestamp: new Date().toISOString(),
-            total_logs: logs.length,
-            analyses: Object.fromEntries(analyses)
-          });
-        } else {
-          const aiProvider = this.aiManager.getProvider(provider);
-          if (!aiProvider || !aiProvider.isAvailable()) {
-            res.status(400).json({ error: `AI provider '${provider}' not available` });
-            return;
-          }
-          
-          const analysis = await aiProvider.analyze(logs);
-          res.json(analysis);
-        }
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to analyze logs' });
-      }
-    });
-
-    // Codebase guardrails endpoints (v1)
-    this.app.post('/api/code/analyze', authenticate, (req, res) => {
-      const { files } = req.body || {};
-      if (!files || !Array.isArray(files)) {
-        res.status(400).json({ error: 'Missing files array' });
-        return;
-      }
-      const summaries = this.codeAnalyzer.summarizeChanged(files);
-      this.knowledge.upsertMany(summaries);
-      res.json({ summaries });
-    });
-
-    this.app.post('/api/code/watch', authenticate, (req, res) => {
-      this.codeAnalyzer.startWatching((changed) => {
-        const summaries = this.codeAnalyzer.summarizeChanged(changed);
-        this.knowledge.upsertMany(summaries);
-        // In future, forward to Cerebrus/OpenAI for deep analysis
-        console.log('Code changed:', summaries.map(s => s.filePath));
-      });
-      res.json({ watching: true });
-    });
-
-    this.app.get('/api/code/knowledge', authenticate, (_req, res) => {
-      res.json({ stats: this.knowledge.getStats(), files: this.knowledge.getAll() });
-    });
-
-    this.app.get('/api/code/graph', authenticate, (_req, res) => {
-      res.json({ graph: this.knowledge.getDependencyGraph() });
-    });
-    this.app.post('/api/guardrails/validate-plan', authenticate, (req, res) => {
-      const { plan, files } = req.body || {};
-      if (!plan) {
-        res.status(400).json({ error: 'Missing plan' });
-        return;
-      }
-      // Minimal heuristic validation; future: integrate deep provider
-      const risks: string[] = [];
-      if (/delete\s+database|drop\s+table/i.test(plan)) risks.push('Potential destructive database operation');
-      if (/remove\s+auth|disable\s+auth/i.test(plan)) risks.push('Potential security/authentication risk');
-      const score = Math.min(1, risks.length * 0.3);
-      res.json({ ok: risks.length === 0, risk_score: score, risks, mitigations: [] });
-    });
-
-    this.app.post('/api/guardrails/validate-diff', authenticate, (req, res) => {
-      const { diff, files } = req.body || {};
-      if (!diff) {
-        res.status(400).json({ error: 'Missing diff' });
-        return;
-      }
-      const risks: string[] = [];
-      if (/console\.log\(/.test(diff)) risks.push('Debug statements left in code');
-      if (/any\b/.test(diff)) risks.push('Loosening TypeScript types with any');
-      const score = Math.min(1, risks.length * 0.2);
-      res.json({ ok: risks.length === 0, risk_score: score, risks, mitigations: [] });
-    });
-
-    this.app.get('/api/github/diff', authenticate, (_req, res) => {
-      const diff = GithubScanner.getLocalDiff();
-      res.json(diff);
-    });
-
-    // Code review endpoint (Cerebrus)
-    this.app.post('/api/code/review', authenticate, async (req, res) => {
-      try {
-        const { diff, plan, files } = req.body || {};
-        const summaries = files && Array.isArray(files) ? this.codeAnalyzer.summarizeChanged(files) : [];
-        const cerebrus = this.aiManager.getProvider('cerebrus') as any;
-        if (!cerebrus || !cerebrus.isAvailable || !cerebrus.isAvailable()) {
-          res.status(400).json({ error: 'Cerebrus provider not available' });
-          return;
-        }
-        const review = await cerebrus.analyzeCodeReview({ summaries, diff, plan });
-        this.knowledge.addReview({ review, diffLength: (diff||'').length, files: files?.length || 0 });
-        res.json(review);
-      } catch (e) {
-        res.status(500).json({ error: 'Review failed' });
-      }
     });
   }
 
@@ -282,6 +159,15 @@ export class DevConsoleServer {
     });
 
     this.wss.on('connection', (ws, req) => {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const path = url.pathname;
+      
+      // Handle collaboration WebSocket connections
+      if (path.startsWith('/api/collaboration/ws/')) {
+        this.handleCollaborationWebSocket(ws, url);
+        return;
+      }
+      
       console.log('🔌 WebSocket client connected');
       
       ws.on('message', (data) => {
@@ -339,6 +225,70 @@ export class DevConsoleServer {
 
   private generateSuggestions(logs: ConsoleLog[]): string[] {
     return generateSuggestions(logs);
+  }
+
+  private handleCollaborationWebSocket(ws: any, url: URL): void {
+    const sessionId = url.pathname.split('/').pop();
+    const participantId = url.searchParams.get('participantId');
+    const participantName = url.searchParams.get('name') || 'Anonymous';
+
+    if (!sessionId || !participantId) {
+      ws.close(1008, 'Missing sessionId or participantId');
+      return;
+    }
+
+    // Join the collaboration session
+    const joined = collaborationManager.joinSession(sessionId, participantId, participantName, ws);
+    if (!joined) {
+      ws.close(1008, 'Session not found');
+      return;
+    }
+
+    console.log(`👤 ${participantName} joined collaboration session ${sessionId}`);
+
+    // Handle incoming messages
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        switch (message.type) {
+          case 'annotation':
+            collaborationManager.addAnnotation(sessionId, {
+              logId: message.logId,
+              authorId: participantId,
+              content: message.content,
+              type: message.annotationType,
+              replies: []
+            });
+            break;
+            
+          case 'cursor':
+            collaborationManager.updateCursor(sessionId, participantId, message.cursor);
+            break;
+            
+          case 'ping':
+            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            break;
+        }
+      } catch (error) {
+        console.warn('Invalid collaboration message:', error);
+      }
+    });
+
+    // Handle disconnection
+    ws.on('close', () => {
+      collaborationManager.leaveSession(sessionId, participantId);
+      console.log(`👤 ${participantName} left collaboration session ${sessionId}`);
+    });
+
+    // Send initial session data
+    const sessionInfo = collaborationManager.getSessionInfo(sessionId);
+    if (sessionInfo) {
+      ws.send(JSON.stringify({
+        type: 'session_info',
+        data: sessionInfo
+      }));
+    }
   }
 
   async stop(): Promise<void> {

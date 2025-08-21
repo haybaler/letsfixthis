@@ -1,0 +1,43 @@
+name: Analyze PR (Non-blocking)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Prepare sample logs (if none present)
+        run: |
+          echo '{"timestamp":"'$(date -u +%FT%TZ)'","level":"error","message":"Sample PR analysis trigger"}' > pr-log.json
+
+      - name: Analyze (non-blocking)
+        run: |
+          set +e
+          node dist/cli.js import-logs --file pr-log.json || true
+          node dist/cli.js analyze --format detailed > analysis.txt || true
+          set -e
+
+      - name: Upload analysis artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: letsfixthis-analysis
+          path: analysis.txt
+
+
