@@ -21,7 +21,15 @@ export class AIProviderManager {
   private providers: Map<string, AIProvider> = new Map();
 
   registerProvider(provider: AIProvider): void {
+    // Always store by canonical name
     this.providers.set(provider.name, provider);
+
+    // Back-compat alias for Cerebras ⇄ Cerebrus
+    if (provider.name === 'cerebras') {
+      this.providers.set('cerebrus', provider);
+    } else if (provider.name === 'cerebrus') {
+      this.providers.set('cerebras', provider);
+    }
   }
 
   getProvider(name: string): AIProvider | undefined {
@@ -29,25 +37,30 @@ export class AIProviderManager {
   }
 
   getAvailableProviders(): string[] {
-    return Array.from(this.providers.values())
-      .filter(provider => provider.isAvailable())
-      .map(provider => provider.name);
+    const names = new Set<string>();
+    for (const prov of this.providers.values()) {
+      if (prov.isAvailable()) {
+        names.add(prov.name);           // canonical name only
+      }
+    }
+    return Array.from(names);
   }
 
   async analyzeWithAll(logs: ConsoleLog[]): Promise<Map<string, AIAnalysis>> {
     const results = new Map<string, AIAnalysis>();
-    
-    for (const [name, provider] of this.providers) {
-      if (provider.isAvailable()) {
-        try {
-          const analysis = await provider.analyze(logs);
-          results.set(name, analysis);
-        } catch (error) {
-          console.error(`Error analyzing with ${name}:`, error);
-        }
+    const processed = new Set<AIProvider>();
+
+    for (const [, provider] of this.providers) {
+      if (processed.has(provider) || !provider.isAvailable()) continue;
+      try {
+        const analysis = await provider.analyze(logs);
+        results.set(provider.name, analysis);
+      } catch (error) {
+        console.error(`Error analyzing with ${provider.name}:`, error);
       }
+      processed.add(provider);
     }
-    
+
     return results;
   }
 

@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-type ProviderName = 'vercel-ai' | 'openai-dev' | 'cerebrus';
+// NOTE: we keep the legacy `cerebrus` identifier for backwards-compatibility,
+// but the canonical provider id moving forward is `cerebras`.
+type ProviderName = 'vercel-ai' | 'openai-dev' | 'cerebras' | 'cerebrus';
 
 interface KeysConfig {
   providers?: Record<string, any>;
@@ -73,10 +75,23 @@ export class KeyResolver {
 
   static getCerebrusConfig(): CerebrusConfig {
     const cfg = loadConfig();
-    const fromFile = cfg.providers?.cerebrus || {};
+    // Prefer the canonical `cerebras` key, fall back to legacy `cerebrus`
+    const fromFile =
+      cfg.providers?.cerebras ||
+      cfg.providers?.cerebrus ||
+      {};
     return {
-      apiKey: fromFile.apiKey || process.env.CEREBRUS_API_KEY,
-      endpoint: fromFile.endpoint || process.env.CEREBRUS_ENDPOINT || 'https://api.cerebrus.ai',
+      // Prefer new env vars, but keep old ones as fallback
+      apiKey:
+        fromFile.apiKey ||
+        process.env.CEREBRAS_API_KEY ||
+        process.env.CEREBRUS_API_KEY,
+      endpoint:
+        fromFile.endpoint ||
+        process.env.CEREBRAS_ENDPOINT ||
+        process.env.CEREBRUS_ENDPOINT ||
+        // default endpoint remains the old URL for now
+        'https://api.cerebrus.ai',
     };
   }
 }

@@ -4,7 +4,8 @@ import { BaseAIProvider, AIAnalysis } from './ai-provider';
 import { KeyResolver } from './key-resolver';
 
 export class CerebrusProvider extends BaseAIProvider {
-  name = 'cerebrus';
+  // Canonical provider id (legacy alias `cerebrus` still supported via AIProviderManager)
+  name = 'cerebras';
   private cerebrusApiKey?: string;
   private cerebrusEndpoint?: string;
 

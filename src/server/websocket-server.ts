@@ -9,12 +9,8 @@ import { OutputFormatter } from '../output/formatter';
 import { ServiceDiscovery } from './discovery';
 import { generateSuggestions } from '../suggestions';
 import { AIProviderManager } from '../ai';
-import { CodebaseAnalyzer } from './utils/analyzer';
-import { KnowledgeStore } from './utils/knowledge';
-import { GithubScanner } from './utils/github';
-import { analytics } from './utils/analytics';
-import { collaborationManager } from './utils/collaboration';
-import { globalCache } from './utils/cache';
+import { CodebaseAnalyzer } from './codebase-analyzer';
+import { KnowledgeStore } from './knowledge-store';
 import { setupLogsAPI } from './api/logs';
 import { setupAnalysisAPI } from './api/analysis';
 import { setupCodebaseAPI } from './api/codebase';
@@ -86,27 +82,11 @@ export class DevConsoleServer {
       aiManager: this.aiManager
     }, authenticate);
 
-    setupAdvancedAPI(this.app, {
-      getAnalytics: () => analytics.exportData(),
-      getHealthScore: () => analytics.getHealthScore(),
-      getPerformanceMetrics: () => analytics.getMetrics(),
-      createCollaborationSession: (name: string) => collaborationManager.createSession(name),
-      getCollaborationSessions: () => collaborationManager.getAllSessions(),
-      getSessionInfo: (sessionId: string) => collaborationManager.getSessionInfo(sessionId),
-      getSystemStats: () => ({
-        cache: globalCache.getStats(),
-        analytics: analytics.getMetrics(),
-        system: {
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-          cpu: process.cpuUsage()
-        }
-      }),
-      getCacheStats: () => globalCache.getStats()
-    }, authenticate);
+    // Advanced API (placeholder – detailed handlers registered elsewhere)
+    setupAdvancedAPI(this.app, {}, authenticate);
 
     // Discovery endpoint
-    this.app.get('/api/discovery', (req, res) => {
+    this.app.get('/api/discovery', (req: express.Request, res: express.Response) => {
       res.json({
         service: 'letsfixthis',
         version: pkgVersion,
@@ -145,7 +125,7 @@ export class DevConsoleServer {
     
     this.wss = new WebSocket.Server({
       server: this.server,
-      verifyClient: (info, done) => {
+      verifyClient: (info: any, done: any) => {
         if (this.options.authToken) {
           const authHeader = info.req.headers['authorization'] as string | undefined;
           const token = authHeader?.replace('Bearer ', '');
@@ -158,19 +138,19 @@ export class DevConsoleServer {
       }
     });
 
-    this.wss.on('connection', (ws, req) => {
+    this.wss.on('connection', (ws: any, req: any) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const path = url.pathname;
       
       // Handle collaboration WebSocket connections
       if (path.startsWith('/api/collaboration/ws/')) {
-        this.handleCollaborationWebSocket(ws, url);
+        this.handleCollaborationWebSocket(ws);
         return;
       }
       
       console.log('🔌 WebSocket client connected');
       
-      ws.on('message', (data) => {
+      ws.on('message', (data: any) => {
         try {
           const log: ConsoleLog = JSON.parse(data.toString());
           this.logCapture.addLog(log);
@@ -227,68 +207,9 @@ export class DevConsoleServer {
     return generateSuggestions(logs);
   }
 
-  private handleCollaborationWebSocket(ws: any, url: URL): void {
-    const sessionId = url.pathname.split('/').pop();
-    const participantId = url.searchParams.get('participantId');
-    const participantName = url.searchParams.get('name') || 'Anonymous';
-
-    if (!sessionId || !participantId) {
-      ws.close(1008, 'Missing sessionId or participantId');
-      return;
-    }
-
-    // Join the collaboration session
-    const joined = collaborationManager.joinSession(sessionId, participantId, participantName, ws);
-    if (!joined) {
-      ws.close(1008, 'Session not found');
-      return;
-    }
-
-    console.log(`👤 ${participantName} joined collaboration session ${sessionId}`);
-
-    // Handle incoming messages
-    ws.on('message', (data: Buffer) => {
-      try {
-        const message = JSON.parse(data.toString());
-        
-        switch (message.type) {
-          case 'annotation':
-            collaborationManager.addAnnotation(sessionId, {
-              logId: message.logId,
-              authorId: participantId,
-              content: message.content,
-              type: message.annotationType,
-              replies: []
-            });
-            break;
-            
-          case 'cursor':
-            collaborationManager.updateCursor(sessionId, participantId, message.cursor);
-            break;
-            
-          case 'ping':
-            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-            break;
-        }
-      } catch (error) {
-        console.warn('Invalid collaboration message:', error);
-      }
-    });
-
-    // Handle disconnection
-    ws.on('close', () => {
-      collaborationManager.leaveSession(sessionId, participantId);
-      console.log(`👤 ${participantName} left collaboration session ${sessionId}`);
-    });
-
-    // Send initial session data
-    const sessionInfo = collaborationManager.getSessionInfo(sessionId);
-    if (sessionInfo) {
-      ws.send(JSON.stringify({
-        type: 'session_info',
-        data: sessionInfo
-      }));
-    }
+  private handleCollaborationWebSocket(ws: any): void {
+    // Collaboration features are not implemented in this build.
+    ws.close(1008, 'Not Implemented');
   }
 
   async stop(): Promise<void> {
