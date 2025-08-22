@@ -6,43 +6,33 @@ import { LogCapture } from './capture/log-capture';
 import { OutputFormatter } from './output/formatter';
 import { ConsoleLog } from './types';
 import { generateSuggestions } from './suggestions';
-import { AIProviderManager } from './ai';
+import { AIProviderManager } from './ai/ai-provider';
+import { VercelAIProvider } from './ai/vercel-ai-provider';
+import { CerebrusProvider } from './ai/cerebrus-provider';
+import { OpenAIDevProvider } from './ai/openai-dev-provider';
 import { version } from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { runStart, runCaptureDirect } from './cli/commands/start';
-import { runAnalyze, runAnalyzeDirect } from './cli/commands/analyze';
-import { runAddLog, runImportLogs, runInteractive, runClear, runDoctor, runInitKeys } from './cli/commands/utility';
-import { runAnalytics, runCollaboration, runSystem, runMonitor } from './cli/commands/advanced';
+import * as readline from 'readline';
 
 // Load environment variables
 dotenv.config();
 
 const program = new Command();
 
-// Initialize AI manager (providers are loaded lazily)
+// Initialize AI providers
 const aiManager = new AIProviderManager();
+aiManager.registerProvider(new VercelAIProvider());
+aiManager.registerProvider(new CerebrusProvider());
+aiManager.registerProvider(new OpenAIDevProvider());
 
 program
   .name('letsfixthis')
-  .description('Capture browser dev console output for AI coding agents')
+  .description('AI-powered CLI tool to capture and analyze console output')
   .version(version);
 
-program
-  .command('start')
-  .description('Start the dev console capture server')
-  .option('-p, --port <port>', 'WebSocket server port', '8090')
-  .option('-h, --host <host>', 'Host to bind to (use 0.0.0.0 for all interfaces)', '0.0.0.0')
-  .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
-  .option('-o, --output <file>', 'Output file path')
-  .option('-l, --log-file <file>', 'Path to log file')
-  .option('--cors-origin <origin>', 'Allowed CORS origin')
-  .option('--token <token>', 'Authentication token for API and WS')
-  .option('-w, --watch', 'Watch mode - continuously capture')
-  .action(async (options) => runStart(options));
-
-// Direct console capture mode - no browser extension required
+// Direct console capture mode - no extension needed
 program
   .command('capture-direct')
   .description('Direct console capture mode - no browser extension required')
@@ -51,60 +41,382 @@ program
   .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
   .option('-o, --output <file>', 'Output file path')
   .option('-l, --log-file <file>', 'Path to log file')
-  .option('--ai-provider <provider>', 'AI provider (vercel-ai|cerebras|openai-dev|auto)', 'auto')
+  .option('--ai-provider <provider>', 'AI provider (vercel-ai|cerebras|cerebrus|openai-dev|auto)', 'auto')
   .option('--auto-analyze', 'Automatically analyze logs with AI')
   .option('--watch', 'Watch mode - continuously capture and analyze')
-  .action(async (options) => runCaptureDirect(options));
-
-program
-  .command('watch')
-  .description('Watch the repository and analyze changes')
-  .option('--server <url>', 'Server URL', 'http://localhost:8090')
   .action(async (options) => {
+    console.log('🚀 Starting LetsfixThis Direct Capture Mode...');
+    console.log('📋 No browser extension required - works directly with CLI');
+    
+    const server = new DevConsoleServer({
+      port: parseInt(options.port),
+      host: options.host,
+      format: options.format,
+      outputFile: options.output,
+      watchMode: options.watch,
+      logFile: options.logFile || process.env.DEV_CONSOLE_LOG_FILE,
+      corsOrigin: process.env.DEV_CONSOLE_ORIGIN,
+      authToken: process.env.DEV_CONSOLE_TOKEN
+    });
+    
+    await server.start();
+    console.log(`📡 Server running on ${options.host}:${options.port}`);
+    console.log('');
+    console.log('🎯 Direct Capture Methods:');
+    console.log('1. Manual log entry: Use "letsfixthis add-log" command');
+    console.log('2. File import: Use "letsfixthis import-logs <file>"');
+    console.log('3. HTTP API: Send POST requests to /api/logs');
+    console.log('4. WebSocket: Connect to ws://localhost:' + options.port);
+    console.log('');
+    
+    if (options.autoAnalyze) {
+      console.log('🤖 Auto-analysis enabled - logs will be analyzed automatically');
+    }
+    
+    if (options.watch) {
+      console.log('👀 Watch mode enabled - continuously monitoring for new logs');
+    }
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\n🛑 Shutting down server...');
+      await server.stop();
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      await server.stop();
+      process.exit(0);
+    });
+  });
+
+// Add log manually
+program
+  .command('add-log')
+  .description('Add a console log entry manually')
+  .option('-l, --level <level>', 'Log level (log|warn|error|info|debug)', 'log')
+  .option('-m, --message <message>', 'Log message')
+  .option('-f, --file <file>', 'Source file path')
+  .option('-n, --line <line>', 'Line number')
+  .option('-c, --column <column>', 'Column number')
+  .option('-s, --stack <stack>', 'Stack trace')
+  .option('--type <type>', 'Log type (console|network|exception)', 'console')
+  .action(async (options) => {
+    const capture = new LogCapture();
+    
+    if (!options.message) {
+      console.error('❌ Message is required. Use --message or -m');
+      process.exit(1);
+    }
+    
+    const log: ConsoleLog = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      level: options.level as any,
+      message: options.message,
+      args: [],
+      url: options.file,
+      lineNumber: options.line ? parseInt(options.line) : undefined,
+      columnNumber: options.column ? parseInt(options.column) : undefined,
+      stack: options.stack,
+      type: options.type as any,
+      source: options.file
+    };
+    
+    await capture.addLog(log);
+    console.log('✅ Log added successfully');
+    console.log(`📝 ${log.level.toUpperCase()}: ${log.message}`);
+  });
+
+// Import logs from file
+program
+  .command('import-logs')
+  .description('Import console logs from a file')
+  .argument('<file>', 'File path to import logs from')
+  .option('-f, --format <format>', 'File format (json|text|csv)', 'json')
+  .option('--clear', 'Clear existing logs before import')
+  .action(async (filePath, options) => {
+    const capture = new LogCapture();
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      process.exit(1);
+    }
+    
+    if (options.clear) {
+      await capture.clearLogs();
+      console.log('🗑️ Cleared existing logs');
+    }
+    
     try {
-      const resp = await fetch(`${options.server}/api/code/watch`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-      console.log(JSON.stringify(await resp.json(), null, 2));
-    } catch (e) {
-      console.error('Failed to start watcher:', e);
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      let logs: ConsoleLog[] = [];
+      
+      if (options.format === 'json') {
+        const data = JSON.parse(fileContent);
+        logs = Array.isArray(data) ? data : data.logs || [];
+      } else if (options.format === 'text') {
+        // Parse text format (simple line-by-line)
+        const lines = fileContent.split('\n').filter(line => line.trim());
+        logs = lines.map((line, index) => {
+          const match = line.match(/^\[(.*?)\] (\w+): (.+)$/);
+          if (match) {
+            return {
+              id: (Date.now() + index).toString(),
+              timestamp: new Date(match[1]).getTime(),
+              level: match[2].toLowerCase() as any,
+              message: match[3],
+              args: [],
+              type: 'console' as any
+            };
+          }
+          return null;
+        }).filter(Boolean) as ConsoleLog[];
+      }
+      
+      for (const log of logs) {
+        await capture.addLog(log);
+      }
+      
+      console.log(`✅ Imported ${logs.length} logs from ${filePath}`);
+    } catch (error) {
+      console.error('❌ Error importing logs:', error);
       process.exit(1);
     }
   });
 
+// Interactive log entry mode
 program
-  .command('knowledge')
-  .description('Show knowledge store summary')
-  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .command('interactive')
+  .description('Interactive mode for entering console logs')
+  .option('-l, --log-file <file>', 'Path to log file')
   .action(async (options) => {
-    const resp = await fetch(`${options.server}/api/code/knowledge`);
-    console.log(JSON.stringify(await resp.json(), null, 2));
+    const capture = new LogCapture(options.logFile);
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    console.log('🎯 Interactive Log Entry Mode');
+    console.log('Enter console logs in format: <level> <message>');
+    console.log('Examples:');
+    console.log('  error Cannot read property of undefined');
+    console.log('  warn Deprecated API usage');
+    console.log('  log Application started');
+    console.log('Type "quit" to exit');
+    console.log('');
+    
+    const askForLog = () => {
+      rl.question('📝 Enter log: ', async (input) => {
+        if (input.toLowerCase() === 'quit') {
+          rl.close();
+          return;
+        }
+        
+        const parts = input.trim().split(' ');
+        if (parts.length < 2) {
+          console.log('❌ Format: <level> <message>');
+          askForLog();
+          return;
+        }
+        
+        const level = parts[0].toLowerCase();
+        const message = parts.slice(1).join(' ');
+        
+        if (!['log', 'warn', 'error', 'info', 'debug'].includes(level)) {
+          console.log('❌ Invalid level. Use: log, warn, error, info, debug');
+          askForLog();
+          return;
+        }
+        
+        const log: ConsoleLog = {
+          id: Date.now().toString(),
+          timestamp: Date.now(),
+          level: level as any,
+          message,
+          args: [],
+          type: 'console'
+        };
+        
+        await capture.addLog(log);
+        console.log(`✅ Added: ${level.toUpperCase()}: ${message}`);
+        askForLog();
+      });
+    };
+    
+    askForLog();
   });
 
+// Enhanced analyze command for direct mode
 program
-  .command('graph')
-  .description('Show dependency graph')
-  .option('--server <url>', 'Server URL', 'http://localhost:8090')
+  .command('analyze-direct')
+  .description('Analyze logs directly without server')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .option('--provider <provider>', 'AI provider (vercel-ai|cerebras|cerebrus|openai-dev|all)', 'all')
+  .option('-f, --format <format>', 'Output format (json|text|detailed)', 'json')
+  .option('--save <file>', 'Save analysis to file')
   .action(async (options) => {
-    const resp = await fetch(`${options.server}/api/code/graph`);
-    console.log(JSON.stringify(await resp.json(), null, 2));
+    const capture = new LogCapture(options.logFile);
+    const logs = await capture.getCurrentLogs();
+    
+    if (logs.length === 0) {
+      console.log('📭 No logs found to analyze');
+      return;
+    }
+    
+    console.log(`🔍 Analyzing ${logs.length} console logs...`);
+    
+    if (options.provider === 'all') {
+      const analyses = await aiManager.analyzeWithAll(logs);
+      
+      if (analyses.size === 0) {
+        console.log('❌ No AI providers available. Please configure API keys.');
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      let output: string;
+      
+      if (options.format === 'detailed') {
+        output = '\n📊 AI Analysis Results:\n\n';
+        for (const [provider, analysis] of analyses) {
+          output += `🤖 ${provider.toUpperCase()}:\n`;
+          output += `   Summary: ${analysis.summary}\n`;
+          output += `   Priority: ${analysis.priority.toUpperCase()}\n`;
+          output += `   Confidence: ${(analysis.confidence * 100).toFixed(1)}%\n`;
+          output += `   Suggestions: ${analysis.suggestions.length}\n`;
+          if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+            output += `   Code Fixes: ${analysis.codeFixes.length}\n`;
+          }
+          output += '\n';
+        }
+      } else {
+        output = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          total_logs: logs.length,
+          analyses: Object.fromEntries(analyses)
+        }, null, 2);
+      }
+      
+      if (options.save) {
+        fs.writeFileSync(options.save, output);
+        console.log(`💾 Analysis saved to ${options.save}`);
+      } else {
+        console.log(output);
+      }
+    } else {
+      const provider = aiManager.getProvider(options.provider);
+      if (!provider || !provider.isAvailable()) {
+        console.error(`❌ AI provider '${options.provider}' not available`);
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      const analysis = await provider.analyze(logs);
+      
+      let output: string;
+      
+      if (options.format === 'detailed') {
+        output = `\n🤖 ${options.provider.toUpperCase()} Analysis:\n\n`;
+        output += `Summary: ${analysis.summary}\n`;
+        output += `Priority: ${analysis.priority.toUpperCase()}\n`;
+        output += `Confidence: ${(analysis.confidence * 100).toFixed(1)}%\n`;
+        output += '\nSuggestions:\n';
+        analysis.suggestions.forEach((suggestion, index) => {
+          output += `  ${index + 1}. ${suggestion}\n`;
+        });
+        if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+          output += '\nCode Fixes:\n';
+          analysis.codeFixes.forEach((fix, index) => {
+            output += `  ${index + 1}. ${fix}\n`;
+          });
+        }
+        if (analysis.explanations && analysis.explanations.length > 0) {
+          output += '\nExplanations:\n';
+          analysis.explanations.forEach((explanation, index) => {
+            output += `  ${index + 1}. ${explanation}\n`;
+          });
+        }
+      } else {
+        output = JSON.stringify(analysis, null, 2);
+      }
+      
+      if (options.save) {
+        fs.writeFileSync(options.save, output);
+        console.log(`💾 Analysis saved to ${options.save}`);
+      } else {
+        console.log(output);
+      }
+    }
   });
 
+// Keep existing commands for backward compatibility
 program
-  .command('review')
-  .description('Run Cerebras code review on a diff/plan')
-  .option('--server <url>', 'Server URL', 'http://localhost:8090')
-  .option('--diff <file>', 'Unified diff file')
-  .option('--plan <file>', 'Plan/description file')
-  .option('--files <list>', 'Comma-separated files to summarize')
+  .command('start')
+  .description('Start the dev console capture server (with extension support)')
+  .option('-p, --port <port>', 'WebSocket server port', '8090')
+  .option('-h, --host <host>', 'Host to bind to (use 0.0.0.0 for all interfaces)', '0.0.0.0')
+  .option('-f, --format <format>', 'Output format (json|text|structured)', 'json')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .option('--cors-origin <origin>', 'Allowed CORS origin')
+  .option('--token <token>', 'Authentication token for API and WS')
+  .option('-w, --watch', 'Watch mode - continuously capture')
   .action(async (options) => {
-    const fs = await import('fs');
-    const body: any = {};
-    if (options.diff) body.diff = fs.readFileSync(options.diff, 'utf8');
-    if (options.plan) body.plan = fs.readFileSync(options.plan, 'utf8');
-    if (options.files) body.files = String(options.files).split(',').map((s: string) => s.trim());
-    const resp = await fetch(`${options.server}/api/code/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    console.log(JSON.stringify(await resp.json(), null, 2));
+    console.log('🚀 Starting LetsfixThis Server (Extension Mode)...');
+    console.log('📋 Browser extension required for console capture');
+    
+    // Check for .letsfixthis config file
+    let configPort = parseInt(options.port);
+    let configHost = options.host;
+    
+    const configPath = path.join(process.cwd(), '.letsfixthis');
+    if (fs.existsSync(configPath)) {
+      try {
+        const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (options.port === '8090' && configData.port) {
+          configPort = configData.port;
+          console.log(`📋 Using port ${configPort} from .letsfixthis config`);
+        }
+        if (options.host === '0.0.0.0' && configData.host) {
+          configHost = configData.host;
+          console.log(`📋 Using host ${configHost} from .letsfixthis config`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error reading .letsfixthis config file:', error);
+      }
+    }
+    
+    const server = new DevConsoleServer({
+      port: configPort,
+      host: configHost,
+      format: options.format,
+      outputFile: options.output,
+      watchMode: options.watch,
+      logFile: options.logFile || process.env.DEV_CONSOLE_LOG_FILE,
+      corsOrigin: options.corsOrigin || process.env.DEV_CONSOLE_ORIGIN,
+      authToken: options.token || process.env.DEV_CONSOLE_TOKEN
+    });
+    
+    await server.start();
+    const displayHost = configHost === '0.0.0.0' ? 'all interfaces' : configHost;
+    console.log(`📡 Server running on ${displayHost}:${configPort}`);
+    console.log('📋 Browser extension ready - refresh your page to start capturing console logs');
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\n🛑 Shutting down server...');
+      await server.stop();
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      await server.stop();
+      process.exit(0);
+    });
   });
 
+// Keep other existing commands
 program
   .command('capture')
   .description('Capture current console state')
@@ -136,7 +448,7 @@ program
   .description('Get formatted info for AI agents')
   .option('-a, --agent <agent>', 'Target agent (cursor|claude|copilot|windsurfer)', 'cursor')
   .option('-l, --log-file <file>', 'Path to log file')
-  .option('--ai-provider <provider>', 'AI provider (vercel-ai|cerebras|openai-dev|auto)', 'auto')
+  .option('--ai-provider <provider>', 'AI provider (vercel-ai|cerebras|cerebrus|openai-dev|auto)', 'auto')
   .action(async (options) => {
     const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     const logs = await capture.getCurrentLogs();
@@ -144,7 +456,6 @@ program
     let formattedOutput: string;
     
     if (options.aiProvider === 'auto') {
-      // Use the best available AI provider
       const analysis = await aiManager.getBestAnalysis(logs);
       if (analysis) {
         const agentInfo = {
@@ -162,7 +473,6 @@ program
         };
         formattedOutput = JSON.stringify(agentInfo, null, 2);
       } else {
-        // Fallback to original format
         const agentInfo = {
           timestamp: new Date().toISOString(),
           agent: options.agent,
@@ -178,20 +488,95 @@ program
         formattedOutput = JSON.stringify(agentInfo, null, 2);
       }
     } else {
-      // Use specific AI provider
       const provider = aiManager.getProvider(options.aiProvider);
-      const resolvedProvider = await provider;
-      if (resolvedProvider && await resolvedProvider.isAvailable()) {
-        formattedOutput = await resolvedProvider.formatForAgent(logs, options.agent);
+      if (provider && provider.isAvailable()) {
+        formattedOutput = await provider.formatForAgent(logs, options.agent);
       } else {
         console.error(`❌ AI provider '${options.aiProvider}' not available`);
-        const available = await aiManager.getAvailableProviders();
-        console.log('Available providers:', available.join(', '));
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
         process.exit(1);
       }
     }
     
     console.log(formattedOutput);
+  });
+
+program
+  .command('analyze')
+  .description('Analyze console logs with AI providers')
+  .option('-l, --log-file <file>', 'Path to log file')
+  .option('--provider <provider>', 'AI provider (vercel-ai|cerebras|cerebrus|openai-dev|all)', 'all')
+  .option('-f, --format <format>', 'Output format (json|text|detailed)', 'json')
+  .action(async (options) => {
+    const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
+    const logs = await capture.getCurrentLogs();
+    
+    console.log(`🔍 Analyzing ${logs.length} console logs...`);
+    
+    if (options.provider === 'all') {
+      const analyses = await aiManager.analyzeWithAll(logs);
+      
+      if (analyses.size === 0) {
+        console.log('❌ No AI providers available. Please configure API keys.');
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      if (options.format === 'detailed') {
+        console.log('\n📊 AI Analysis Results:\n');
+        for (const [provider, analysis] of analyses) {
+          console.log(`🤖 ${provider.toUpperCase()}:`);
+          console.log(`   Summary: ${analysis.summary}`);
+          console.log(`   Priority: ${analysis.priority.toUpperCase()}`);
+          console.log(`   Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
+          console.log(`   Suggestions: ${analysis.suggestions.length}`);
+          if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+            console.log(`   Code Fixes: ${analysis.codeFixes.length}`);
+          }
+          console.log('');
+        }
+      } else {
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          total_logs: logs.length,
+          analyses: Object.fromEntries(analyses)
+        }, null, 2));
+      }
+    } else {
+      const provider = aiManager.getProvider(options.provider);
+      if (!provider || !provider.isAvailable()) {
+        console.error(`❌ AI provider '${options.provider}' not available`);
+        console.log('Available providers:', aiManager.getAvailableProviders().join(', '));
+        return;
+      }
+      
+      const analysis = await provider.analyze(logs);
+      
+      if (options.format === 'detailed') {
+        console.log(`\n🤖 ${options.provider.toUpperCase()} Analysis:\n`);
+        console.log(`Summary: ${analysis.summary}`);
+        console.log(`Priority: ${analysis.priority.toUpperCase()}`);
+        console.log(`Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
+        console.log('\nSuggestions:');
+        analysis.suggestions.forEach((suggestion, index) => {
+          console.log(`  ${index + 1}. ${suggestion}`);
+        });
+        if (analysis.codeFixes && analysis.codeFixes.length > 0) {
+          console.log('\nCode Fixes:');
+          analysis.codeFixes.forEach((fix, index) => {
+            console.log(`  ${index + 1}. ${fix}`);
+          });
+        }
+        if (analysis.explanations && analysis.explanations.length > 0) {
+          console.log('\nExplanations:');
+          analysis.explanations.forEach((explanation, index) => {
+            console.log(`  ${index + 1}. ${explanation}`);
+          });
+        }
+      } else {
+        console.log(JSON.stringify(analysis, null, 2));
+      }
+    }
   });
 
 program
@@ -201,301 +586,7 @@ program
   .action(async (options) => {
     const capture = new LogCapture(options.logFile || process.env.DEV_CONSOLE_LOG_FILE);
     await capture.clearLogs();
-    console.log('🗑️  Logs cleared');
+    console.log('🗑️ Logs cleared');
   });
-
-program
-  .command('analyze')
-  .description('Analyze console logs with AI providers')
-  .option('-l, --log-file <file>', 'Path to log file')
-  .option('--provider <provider>', 'AI provider (vercel-ai|cerebras|openai-dev|all)', 'all')
-  .option('-f, --format <format>', 'Output format (json|text|detailed)', 'json')
-  .action(async (options) => runAnalyze(options));
-
-// Health check and setup helpers
-program
-  .command('doctor')
-  .description('Diagnose configuration and provider availability')
-  .action(async () => {
-    const providers = ['vercel-ai', 'cerebras', 'openai-dev'];
-    const available = aiManager.getAvailableProviders();
-    console.log('🩺 LetsfixThis Doctor\n');
-    console.log(`Providers registered: ${providers.join(', ')}`);
-    const availableProviders = await available;
-    console.log(`Providers available: ${availableProviders.join(', ') || '(none)'}`);
-    const keysFile = path.join(process.cwd(), '.letsfixthis.keys.json');
-    console.log(`Keys file: ${fs.existsSync(keysFile) ? keysFile : '(not found in current dir)'}`);
-    console.log('Environment variables (presence only):');
-    const envFlags = {
-      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
-      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
-      VERCEL_AI_OPENAI_API_KEY: !!process.env.VERCEL_AI_OPENAI_API_KEY,
-      VERCEL_AI_OPENAI_BASE_URL: !!process.env.VERCEL_AI_OPENAI_BASE_URL,
-      OPENAI_DEV_OPENAI_API_KEY: !!process.env.OPENAI_DEV_OPENAI_API_KEY,
-      OPENAI_DEV_OPENAI_BASE_URL: !!process.env.OPENAI_DEV_OPENAI_BASE_URL,
-      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
-      VERCEL_AI_ANTHROPIC_API_KEY: !!process.env.VERCEL_AI_ANTHROPIC_API_KEY,
-      CEREBRAS_API_KEY: !!process.env.CEREBRAS_API_KEY,
-      CEREBRAS_ENDPOINT: !!process.env.CEREBRAS_ENDPOINT,
-    } as Record<string, boolean>;
-    Object.entries(envFlags).forEach(([k, v]) => console.log(`  ${k}: ${v ? 'set' : 'not set'}`));
-    console.log('\nNext steps:');
-    console.log('- Run "letsfixthis init-keys" to create a keys file template');
-    console.log('- Or export provider-specific environment variables (see README)');
-  });
-
-program
-  .command('init-keys')
-  .description('Create a .letsfixthis.keys.json template in the current directory')
-  .action(() => {
-    const target = path.join(process.cwd(), '.letsfixthis.keys.json');
-    if (fs.existsSync(target)) {
-      console.log('✔️  .letsfixthis.keys.json already exists');
-      return;
-    }
-    const template = {
-      providers: {
-        'vercel-ai': {
-          openai: { apiKey: 'YOUR_OPENAI_KEY', baseURL: 'https://api.openai.com/v1' },
-          anthropic: { apiKey: 'YOUR_ANTHROPIC_KEY' }
-        },
-        'openai-dev': {
-          openai: { apiKey: 'YOUR_OPENAI_KEY', baseURL: 'https://api.openai.com/v1' }
-        },
-        cerebras: { apiKey: 'YOUR_CEREBRAS_KEY', endpoint: 'https://api.cerebras.ai' }
-      }
-    } as any;
-    fs.writeFileSync(target, JSON.stringify(template, null, 2));
-    console.log('✅ Created .letsfixthis.keys.json');
-  });
-
-program
-  .command('add-log')
-  .description('Add a log entry directly via CLI')
-  .option('-m, --message <message>', 'Log message')
-  .option('-l, --level <level>', 'Log level (log|warn|error|info|debug)', 'log')
-  .option('-f, --file <file>', 'Source file')
-  .option('-n, --line <line>', 'Line number')
-  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
-  .action(async (options) => {
-    try {
-      const logEntry = {
-        message: options.message,
-        level: options.level,
-        timestamp: new Date().toISOString(),
-        source: {
-          file: options.file,
-          line: options.line ? parseInt(options.line) : undefined
-        }
-      };
-      
-      const response = await fetch(`${options.server}/api/logs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logEntry)
-      });
-      
-      if (response.ok) {
-        console.log('✅ Log added successfully');
-      } else {
-        console.error('❌ Failed to add log:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ Error adding log:', error);
-    }
-  });
-
-program
-  .command('import-logs')
-  .description('Import logs from a file')
-  .option('-f, --file <file>', 'Log file to import')
-  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
-  .action(async (options) => {
-    if (!options.file) {
-      console.error('❌ Please specify a file with --file');
-      return;
-    }
-    
-    try {
-      const logData = fs.readFileSync(options.file, 'utf8');
-      const logs = JSON.parse(logData);
-      
-      const response = await fetch(`${options.server}/api/logs/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logs })
-      });
-      
-      if (response.ok) {
-        console.log(`✅ Imported ${logs.length} logs successfully`);
-      } else {
-        console.error('❌ Failed to import logs:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ Error importing logs:', error);
-    }
-  });
-
-program
-  .command('interactive')
-  .description('Interactive mode for adding logs')
-  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
-  .action(async (options) => {
-    const readline = require('readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    
-    console.log('🎯 Interactive mode - type "quit" to exit');
-    console.log('Format: <level>:<message> (e.g., error:Something went wrong)');
-    
-    const askQuestion = () => {
-      rl.question('> ', async (input: string) => {
-        if (input.toLowerCase() === 'quit') {
-          rl.close();
-          return;
-        }
-        
-        const [level, ...messageParts] = input.split(':');
-        const message = messageParts.join(':').trim();
-        
-        if (!message) {
-          console.log('❌ Please provide a message');
-          askQuestion();
-          return;
-        }
-        
-        try {
-          const logEntry = {
-            message,
-            level: level || 'log',
-            timestamp: new Date().toISOString()
-          };
-          
-          const response = await fetch(`${options.server}/api/logs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(logEntry)
-          });
-          
-          if (response.ok) {
-            console.log('✅ Log added');
-          } else {
-            console.error('❌ Failed to add log');
-          }
-        } catch (error) {
-          console.error('❌ Error:', error);
-        }
-        
-        askQuestion();
-      });
-    };
-    
-    askQuestion();
-  });
-
-program
-  .command('analyze-direct')
-  .description('Analyze logs directly with AI providers')
-  .option('-p, --provider <provider>', 'AI provider (vercel-ai|cerebras|openai-dev|all)', 'all')
-  .option('-f, --format <format>', 'Output format (json|detailed)', 'detailed')
-  .option('-s, --server <url>', 'Server URL', 'http://localhost:8090')
-  .action(async (options) => {
-    try {
-      const response = await fetch(`${options.server}/api/analyze?provider=${options.provider}&format=${options.format}`);
-      const result = await response.json();
-      
-      if (options.format === 'detailed') {
-        console.log('\n🤖 AI Analysis Results:\n');
-        if (result.analyses) {
-          for (const [provider, analysis] of Object.entries(result.analyses)) {
-            console.log(`🤖 ${provider.toUpperCase()}:`);
-            console.log(`   Summary: ${(analysis as any).summary}`);
-            console.log(`   Priority: ${(analysis as any).priority.toUpperCase()}`);
-            console.log(`   Confidence: ${((analysis as any).confidence * 100).toFixed(1)}%`);
-            console.log('');
-          }
-        } else {
-          console.log(`Summary: ${result.summary}`);
-          console.log(`Priority: ${result.priority.toUpperCase()}`);
-          console.log(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
-        }
-      } else {
-        console.log(JSON.stringify(result, null, 2));
-      }
-    } catch (error) {
-      console.error('❌ Error analyzing logs:', error);
-    }
-  });
-
-program
-  .command('guardrails')
-  .description('Validate plans or diffs against guardrails')
-  .option('--plan <file>', 'Path to a plan file (markdown/text)')
-  .option('--diff <file>', 'Path to a unified diff/patch file')
-  .option('--server <url>', 'Server URL', 'http://localhost:8090')
-  .action(async (options) => {
-    try {
-      if (options.plan) {
-        const plan = require('fs').readFileSync(options.plan, 'utf8');
-        const resp = await fetch(`${options.server}/api/guardrails/validate-plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) });
-        console.log(JSON.stringify(await resp.json(), null, 2));
-        return;
-      }
-      if (options.diff) {
-        const diff = require('fs').readFileSync(options.diff, 'utf8');
-        const resp = await fetch(`${options.server}/api/guardrails/validate-diff`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diff }) });
-        console.log(JSON.stringify(await resp.json(), null, 2));
-        return;
-      }
-      console.error('Provide --plan or --diff');
-      process.exit(1);
-    } catch (e) {
-      console.error('Guardrails validation failed:', e);
-      process.exit(1);
-    }
-  });
-
-// Advanced Analytics Commands
-program
-  .command('analytics')
-  .description('Show analytics dashboard and insights')
-  .option('-f, --format <format>', 'Output format (json|text)', 'text')
-  .option('-e, --export <file>', 'Export analytics to file')
-  .action(async (options) => runAnalytics(options));
-
-// Collaboration Commands
-program
-  .command('collaboration')
-  .description('Manage real-time collaboration sessions')
-  .argument('<action>', 'Action to perform (create|list|join|info)')
-  .option('-n, --name <name>', 'Session name (for create)')
-  .option('-s, --session-id <id>', 'Session ID (for info)')
-  .action(async (action, options) => {
-    const collaborationOptions = {
-      action: action as 'create' | 'list' | 'join' | 'info',
-      name: options.name,
-      sessionId: options.sessionId
-    };
-    await runCollaboration(collaborationOptions);
-  });
-
-// System Commands
-program
-  .command('system')
-  .description('System monitoring and management')
-  .argument('<action>', 'Action to perform (stats|cache|health|reset)')
-  .option('--clear', 'Clear cache (for cache action)')
-  .option('-p, --pattern <pattern>', 'Cache pattern to clear')
-  .action(async (action, options) => runSystem({ action, ...options }));
-
-// Monitor Command
-program
-  .command('monitor')
-  .description('Real-time system monitoring')
-  .option('-i, --interval <ms>', 'Monitoring interval in milliseconds', '5000')
-  .option('-d, --duration <ms>', 'Monitoring duration in milliseconds', '60000')
-  .action(async (options) => runMonitor(options));
 
 program.parse();
