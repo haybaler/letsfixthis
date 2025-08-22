@@ -16,16 +16,20 @@ export function setupAnalysisAPI(app: Application, { aiManager, logCapture }: Op
     try {
       if (provider === 'all') {
         const analyses = await aiManager.analyzeWithAll(logs);
-        return res.json({ timestamp: new Date().toISOString(), total_logs: logs.length, analyses: Object.fromEntries(analyses) });
+        res.json({ timestamp: new Date().toISOString(), total_logs: logs.length, analyses: Object.fromEntries(analyses) });
+        return;
       }
       const prov = aiManager.getProvider(provider);
       if (!prov || !prov.isAvailable()) {
-        return res.status(400).json({ error: `Provider '${provider}' not available`, available: aiManager.getAvailableProviders() });
+        res.status(400).json({ error: `Provider '${provider}' not available`, available: aiManager.getAvailableProviders() });
+        return;
       }
       const analysis = await prov.analyze(logs);
-      return res.json(analysis);
+      res.json(analysis);
+      return;
     } catch (e) {
-      return res.status(500).json({ error: 'Analysis failed', details: String(e) });
+      res.status(500).json({ error: 'Analysis failed', details: String(e) });
+      return;
     }
   });
 
@@ -39,17 +43,21 @@ export function setupAnalysisAPI(app: Application, { aiManager, logCapture }: Op
       if (aiProvider === 'auto') {
         const analysis = await aiManager.getBestAnalysis(logs);
         const payload = generateAgentInfo(logs, agent, analysis || undefined);
-        return res.json(payload);
+        res.json(payload);
+        return;
       } else {
         const provider = aiManager.getProvider(aiProvider);
         if (!provider || !provider.isAvailable()) {
-          return res.status(400).json({ error: `AI provider '${aiProvider}' not available`, available: aiManager.getAvailableProviders() });
+          res.status(400).json({ error: `AI provider '${aiProvider}' not available`, available: aiManager.getAvailableProviders() });
+          return;
         }
         const formatted = await provider.formatForAgent(logs, agent);
-        return res.json(JSON.parse(formatted));
+        res.json(JSON.parse(formatted));
+        return;
       }
     } catch (e) {
-      return res.status(500).json({ error: 'Failed to generate agent info', details: String(e) });
+      res.status(500).json({ error: 'Failed to generate agent info', details: String(e) });
+      return;
     }
   });
 }

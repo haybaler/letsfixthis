@@ -36,9 +36,11 @@ export class DevConsoleServer {
     // Initialize AI provider manager (providers are loaded lazily)
     this.aiManager = new AIProviderManager();
     
-    this.setupExpress();
     this.codeAnalyzer = new CodebaseAnalyzer({ rootDir: process.cwd() });
     this.knowledge = new KnowledgeStore();
+
+    // Setup express routes after all collaborators are ready
+    this.setupExpress();
   }
 
   private setupExpress(): void {
